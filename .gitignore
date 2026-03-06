@@ -1,0 +1,12 @@
+# Root workspace — build artifacts should never be committed
+biznex-dist/
+
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# Windows system folders
+$RECYCLE.BIN/
+System Volume Information/
+app.zip

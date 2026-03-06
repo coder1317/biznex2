@@ -1,0 +1,14 @@
+node_modules/
+logs/
+backups/
+.env
+dist/
+*.log
+
+# Release artifacts — tracked separately, don't commit binaries
+releases/*.exe
+releases/*.AppImage
+releases/*.deb
+releases/*.zip
+releases/*.dmg
+releases/*.blockmap
