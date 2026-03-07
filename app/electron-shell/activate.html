@@ -236,7 +236,7 @@
   </form>
 
   <div class="footer">
-    Need a key? <a href="#" id="buyLink">Purchase at biznex.io/pricing</a><br>
+    Need a key? <a href="#" id="buyLink">Purchase a license →</a><br>
     Your key was sent to your email after purchase.
   </div>
   <div class="version" id="versionLabel"></div>
@@ -436,7 +436,7 @@
 
   document.getElementById('buyLink').addEventListener('click', function (e) {
     e.preventDefault();
-    if (ipc && ipc.openExternal) ipc.openExternal('https://biznex.io/pricing');
+    if (ipc && ipc.openExternal) ipc.openExternal('http://localhost:5000');
   });
 </script>
 </body>
