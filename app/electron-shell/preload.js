@@ -65,3 +65,14 @@ contextBridge.exposeInMainWorld('SYNC', {
     /** Get last sync status from disk */
     getStatus: () => ipcRenderer.invoke('sync:get-status'),
 });
+
+// Open the Biznex Portal in the default browser
+contextBridge.exposeInMainWorld('APP_ACTIONS', {
+    openPortal: () => ipcRenderer.send('license:open-external', 'http://localhost:5000'),
+});
+
+// OS-level startup (launch on login) settings
+contextBridge.exposeInMainWorld('APP_SETTINGS', {
+    getStartup: ()      => ipcRenderer.invoke('app:get-startup'),
+    setStartup: (enable) => ipcRenderer.invoke('app:set-startup', enable),
+});

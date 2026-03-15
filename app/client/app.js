@@ -662,6 +662,7 @@ function renderSidebar() {
                         }
                     })()}
                 </div>
+                <button onclick="openAppSettings()" class="sidebar-logout" title="Settings" style="margin-right:4px;">⚙</button>
                 <button onclick="logout()" class="sidebar-logout" title="Logout">⏻</button>
             </div>
         </aside>
@@ -1852,13 +1853,70 @@ function renderLockedPage(feature) {
    UPGRADE PROMPT  (toast + redirect info)
 ====================== */
 function showUpgradePrompt(feature) {
-    const msgs = {
-        multistore: 'Multi-Store requires the Business plan (BZNX-BIZ-...). Purchase at biznex.io/pricing',
-        analytics:  'Analytics Pro requires the Enterprise plan (BZNX-ENT-...). Purchase at biznex.io/pricing',
-        general:    'Unlock more features by upgrading your plan at biznex.io/pricing',
+    const labels = {
+        multistore: 'Business plan (BZNX-BIZ-...)',
+        analytics:  'Enterprise plan (BZNX-ENT-...)',
+        general:    'a higher plan',
     };
-    const msg = msgs[feature] || msgs.general;
-    showToast(msg, 'info', 6000);
+    const label = labels[feature] || labels.general;
+    // Show a persistent action toast that also opens the portal
+    const toastId = 'upgrade-toast-' + Date.now();
+    const container = document.getElementById('toast-container') || document.body;
+    const div = document.createElement('div');
+    div.id = toastId;
+    div.className = 'toast info';
+    div.style.cssText = 'display:flex;flex-direction:column;gap:8px;max-width:340px;';
+    div.innerHTML = `
+        <span>This feature requires ${label}.</span>
+        <button onclick="openPortalForUpgrade();document.getElementById('${toastId}')?.remove()"
+            style="align-self:flex-start;padding:5px 14px;background:#818cf8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
+            Manage Plan on Portal →
+        </button>`;
+    container.appendChild(div);
+    setTimeout(() => div.remove(), 9000);
+}
+
+function openPortalForUpgrade() {
+    if (window.APP_ACTIONS?.openPortal) {
+        window.APP_ACTIONS.openPortal();
+    } else {
+        window.open('http://localhost:5000', '_blank');
+    }
+}
+
+async function openAppSettings() {
+    const startupEnabled = await window.APP_SETTINGS?.getStartup().catch(() => false);
+    const overlay = document.createElement('div');
+    overlay.id = 'appSettingsModal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:#1e1e2e;border:1px solid #313147;border-radius:12px;padding:28px 32px;min-width:320px;max-width:400px;color:#e2e8f0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h3 style="margin:0;font-size:16px;font-weight:700;">App Settings</h3>
+                <button onclick="document.getElementById('appSettingsModal').remove()"
+                    style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;">✕</button>
+            </div>
+            <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 0;border-top:1px solid #313147;">
+                <input type="checkbox" id="startupToggle" ${startupEnabled ? 'checked' : ''}
+                    onchange="setStartupEnabled(this.checked)"
+                    style="width:18px;height:18px;cursor:pointer;accent-color:#818cf8;">
+                <div>
+                    <div style="font-size:14px;font-weight:600;">Launch on system startup</div>
+                    <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Open Biznex BOS automatically when you log in.</div>
+                </div>
+            </label>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function setStartupEnabled(enable) {
+    try {
+        await window.APP_SETTINGS?.setStartup(enable);
+        showToast('Startup preference saved.', 'success', 2500);
+    } catch (err) {
+        showToast('Could not update startup setting.', 'error', 3000);
+    }
 }
 
 // Removed legacy duplicate addProduct (kept later version with category)

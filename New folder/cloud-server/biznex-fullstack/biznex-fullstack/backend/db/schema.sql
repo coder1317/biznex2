@@ -1,0 +1,67 @@
+DROP TABLE IF EXISTS orders;
+
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  store_id TEXT NOT NULL,
+  employee TEXT NOT NULL,
+  customer TEXT,
+  total REAL NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS products;
+
+CREATE TABLE products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  sku TEXT UNIQUE,
+  category TEXT,
+  price REAL NOT NULL,
+  cost REAL,
+  quantity INTEGER NOT NULL DEFAULT 0,
+  reorder_point INTEGER DEFAULT 0,
+  supplier TEXT,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  store_id TEXT NOT NULL,
+  employee TEXT NOT NULL,
+  customer TEXT,
+  total REAL NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  sku TEXT UNIQUE,
+  category TEXT,
+  price REAL NOT NULL,
+  cost REAL,
+  quantity INTEGER NOT NULL DEFAULT 0,
+  reorder_point INTEGER DEFAULT 0,
+  supplier TEXT,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id INTEGER NOT NULL,
+  product_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  price REAL NOT NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+CREATE TABLE IF NOT EXISTS complaints (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  employee TEXT NOT NULL,
+  details TEXT NOT NULL,
+  status TEXT DEFAULT 'Pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

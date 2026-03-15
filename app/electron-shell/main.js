@@ -343,6 +343,13 @@ ipcMain.on('license:use-trial', async () => {
     }
 });
 
+// ─── System startup (boot on login) ──────────────────────────────────────────
+ipcMain.handle('app:get-startup', () => app.getLoginItemSettings().openAtLogin);
+ipcMain.handle('app:set-startup', (_event, enable) => {
+    app.setLoginItemSettings({ openAtLogin: Boolean(enable) });
+    return true;
+});
+
 // ─── Startup license gate ─────────────────────────────────────────────────────
 app.whenReady().then(async () => {
     // Dev mode: bypass the license gate UNLESS SKIP_LICENSE_CHECK=false is set.

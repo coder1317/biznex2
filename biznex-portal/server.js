@@ -44,6 +44,10 @@ db.serialize(() => {
         active     INTEGER DEFAULT 1,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`);
+    // Credential columns — safely ignored if already present
+    db.run(`ALTER TABLE accounts ADD COLUMN username TEXT`, () => {});
+    db.run(`ALTER TABLE accounts ADD COLUMN password_hash TEXT`, () => {});
+    db.run(`ALTER TABLE accounts ADD COLUMN credentials_changed INTEGER DEFAULT 0`, () => {});
     db.run('SELECT 1', () => console.log('[portal] SQLite schema ready'));
 });
 
@@ -62,6 +66,36 @@ function generateKey(plan) {
     const a = crypto.randomBytes(4).toString('hex').toUpperCase();
     const b = crypto.randomBytes(4).toString('hex').toUpperCase();
     return `BZNX-${p}-${a}-${b}`;
+}
+
+/* ── Credential helpers ───────────────────────────────────────────────────── */
+function generateUsername(name) {
+    const base   = name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '').slice(0, 14) || 'user';
+    const suffix = crypto.randomBytes(3).toString('hex'); // 6 hex chars ≈ 16.7M combinations
+    return `${base}.${suffix}`;
+}
+
+function generatePassword() {
+    // 14 chars — no ambiguous chars (0/O, 1/l/I)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$%!';
+    return Array.from(crypto.randomBytes(14)).map(b => chars[b % chars.length]).join('');
+}
+
+function hashPassword(plaintext) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.scryptSync(plaintext, salt, 64).toString('hex');
+    return `${salt}:${hash}`;
+}
+
+/** Returns a cryptographically random 6-digit OTP not currently active in the store. */
+function generateUniqueOtp() {
+    const active = new Set([...otpStore.values()].map(e => e.code));
+    let code; let attempts = 0;
+    do {
+        code = String(crypto.randomInt(100000, 1000000));
+        attempts++;
+    } while (active.has(code) && attempts < 20);
+    return code;
 }
 
 /* ── BOS License Server sync ─────────────────────────────────────────────── */
@@ -123,10 +157,17 @@ async function sendVerificationEmail(to, name, code) {
     return true;
 }
 
-async function sendKeyEmail(to, name, key, plan) {
+async function sendKeyEmail(to, name, key, plan, credentials = null) {
     const t = makeTransporter();
     if (!t) return false;
     const meta = PLAN_MAP[plan] || PLAN_MAP.starter;
+    const credBlock = credentials ? `
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:20px;margin-top:20px;">
+            <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Your Portal Login Credentials</div>
+            <div style="margin-bottom:10px;"><div style="font-size:11px;color:#94a3b8;">Username</div><div style="font-family:monospace;font-size:16px;font-weight:700;color:#a5b4fc;">${credentials.username}</div></div>
+            <div><div style="font-size:11px;color:#94a3b8;">Password</div><div style="font-family:monospace;font-size:16px;font-weight:700;color:#a5b4fc;">${credentials.password}</div></div>
+            <p style="font-size:11px;color:#64748b;margin-top:12px;line-height:1.5;">You can change these once (no code needed) from your dashboard. After that, changes require email verification.</p>
+        </div>` : '';
     await t.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER, to,
         subject: `Your Biznex ${meta.label} License Key`,
@@ -134,7 +175,28 @@ async function sendKeyEmail(to, name, key, plan) {
             <div style="background:#4f46e5;padding:24px 32px;"><h2 style="margin:0;color:#fff;">Biznex BOS</h2></div>
             <div style="padding:32px;"><p>Hi <b>${name}</b>,</p><p>Your license key:</p>
             <div style="background:#1e293b;border-radius:10px;padding:20px;text-align:center;font-family:monospace;font-size:22px;font-weight:700;letter-spacing:3px;color:#a5b4fc;">${key}</div>
-            <p style="font-size:13px;color:#94a3b8;">Plan: <b>${meta.label}</b> · Max devices: <b>${meta.maxDevices >= 999999 ? 'Unlimited' : meta.maxDevices}</b></p></div></div>`,
+            <p style="font-size:13px;color:#94a3b8;">Plan: <b>${meta.label}</b> · Max devices: <b>${meta.maxDevices >= 999999 ? 'Unlimited' : meta.maxDevices}</b></p>
+            ${credBlock}</div></div>`,
+    });
+    return true;
+}
+
+async function sendCredentialsEmail(to, name, username, plainPassword) {
+    const t = makeTransporter();
+    if (!t) return false;
+    await t.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER, to,
+        subject: 'Biznex Portal — Your Credentials Have Been Updated',
+        html: `<div style="font-family:Arial;max-width:520px;background:#0d1526;color:#e2e8f0;border-radius:12px;overflow:hidden;">
+            <div style="background:#4f46e5;padding:20px 28px;"><h2 style="margin:0;color:#fff;">Biznex Portal</h2></div>
+            <div style="padding:28px;">
+                <p>Hi <b>${name}</b>, your portal login credentials have been updated.</p>
+                <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:20px;margin:16px 0;">
+                    <div style="margin-bottom:10px;"><div style="font-size:11px;color:#94a3b8;">Username</div><div style="font-family:monospace;font-size:16px;font-weight:700;color:#a5b4fc;">${username}</div></div>
+                    <div><div style="font-size:11px;color:#94a3b8;">Password</div><div style="font-family:monospace;font-size:16px;font-weight:700;color:#a5b4fc;">${plainPassword}</div></div>
+                </div>
+                <p style="font-size:12px;color:#64748b;">If you did not make this change, please contact support immediately.</p>
+            </div></div>`,
     });
     return true;
 }
@@ -178,7 +240,7 @@ app.post('/api/send-verification', otpLimiter, async (req, res) => {
     if (!name || !email) return res.status(400).json({ error: 'Name and email are required.' });
     if (!PLAN_MAP[plan])  return res.status(400).json({ error: 'Invalid plan.' });
 
-    const code    = String(Math.floor(100000 + Math.random() * 900000));
+    const code    = generateUniqueOtp();
     const expires = Date.now() + 10 * 60 * 1000;
     otpStore.set(email.toLowerCase(), { code, expires, name, plan });
 
@@ -221,19 +283,26 @@ app.post('/api/verify-code', otpLimiter, async (req, res) => {
         return res.status(409).json({ error: 'Email already registered.', key: k || null });
     }
 
-    const result  = await dbRun('INSERT INTO accounts (name, email) VALUES (?, ?)', [name, email.toLowerCase()]);
-    const acctId  = result.lastID;
-    const key     = generateKey(plan);
-    const meta    = PLAN_MAP[plan];
+    const result   = await dbRun('INSERT INTO accounts (name, email) VALUES (?, ?)', [name, email.toLowerCase()]);
+    const acctId   = result.lastID;
+    const key      = generateKey(plan);
+    const meta     = PLAN_MAP[plan];
     await dbRun('INSERT INTO license_keys (account_id, key, plan, max_devices) VALUES (?, ?, ?, ?)',
         [acctId, key, plan, meta.maxDevices >= 999999 ? 999999 : meta.maxDevices]);
 
+    // Auto-generate portal login credentials
+    const username = generateUsername(name);
+    const plainPwd = generatePassword();
+    const pwdHash  = hashPassword(plainPwd);
+    await dbRun('UPDATE accounts SET username = ?, password_hash = ? WHERE id = ?', [username, pwdHash, acctId]);
+
     const account = await dbGet('SELECT * FROM accounts WHERE id = ?', [acctId]);
     let emailSent = false;
-    try { emailSent = await sendKeyEmail(email, name, key, plan); } catch {}
+    try { emailSent = await sendKeyEmail(email, name, key, plan, { username, password: plainPwd }); } catch {}
     syncKeyToBOS(key, plan, name, email).catch(() => {});
 
-    res.json({ account, key, plan, planType: meta.planType, maxDevices: meta.maxDevices, emailSent,
+    res.json({ account, key, plan, planType: meta.planType, maxDevices: meta.maxDevices,
+        username, emailSent,
         emailNote: emailSent ? null : 'Configure SMTP in .env to enable email delivery.' });
 });
 
@@ -267,7 +336,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     const account = await dbGet('SELECT id, name FROM accounts WHERE email = ?', [email.toLowerCase()]);
     if (!account) return res.status(404).json({ error: 'No account found for that email.' });
 
-    const loginCode = String(Math.floor(100000 + Math.random() * 900000));
+    const loginCode = generateUniqueOtp();
     const expires   = Date.now() + 10 * 60 * 1000;
     otpStore.set(email.toLowerCase() + ':login', { code: loginCode, expires });
 
@@ -408,6 +477,134 @@ app.post('/api/admin/sync-to-bos', async (req, res) => {
         results.push({ key: k.key, plan: k.plan, status });
     }
     res.json({ synced: results.length, results });
+});
+
+// UPGRADE PLAN — Step 1: send OTP to verify identity; Step 2: verify + generate new key
+app.post('/api/upgrade-plan', otpLimiter, async (req, res) => {
+    const { email, code, newPlan } = req.body;
+    if (!email)                      return res.status(400).json({ error: 'Email is required.' });
+    if (!newPlan || !PLAN_MAP[newPlan]) return res.status(400).json({ error: 'Invalid plan.' });
+
+    const account = await dbGet('SELECT id, name FROM accounts WHERE email = ?', [email.toLowerCase()]);
+    if (!account) return res.status(404).json({ error: 'No account found for that email.' });
+
+    // Step 2: verify OTP and generate the new key
+    if (code) {
+        const entry = otpStore.get(email.toLowerCase() + ':upgrade');
+        if (!entry) return res.status(400).json({ error: 'No upgrade request found. Please request a new code.' });
+        if (Date.now() > entry.expires) {
+            otpStore.delete(email.toLowerCase() + ':upgrade');
+            return res.status(400).json({ error: 'Code expired. Please request a new one.' });
+        }
+        if (String(entry.code) !== String(code).trim())
+            return res.status(400).json({ error: 'Incorrect code. Please try again.' });
+        if (entry.newPlan !== newPlan)
+            return res.status(400).json({ error: 'Plan mismatch. Please start the upgrade again.' });
+
+        otpStore.delete(email.toLowerCase() + ':upgrade');
+
+        const key  = generateKey(newPlan);
+        const meta = PLAN_MAP[newPlan];
+        await dbRun('INSERT INTO license_keys (account_id, key, plan, max_devices) VALUES (?, ?, ?, ?)',
+            [account.id, key, newPlan, meta.maxDevices >= 999999 ? 999999 : meta.maxDevices]);
+
+        let emailSent = false;
+        try { emailSent = await sendKeyEmail(email, account.name, key, newPlan); } catch {}
+        syncKeyToBOS(key, newPlan, account.name, email).catch(() => {});
+
+        return res.json({
+            success: true, key, plan: newPlan, planLabel: meta.label,
+            maxDevices: meta.maxDevices, emailSent,
+            emailNote: emailSent ? null : 'Configure SMTP in .env to enable email delivery.',
+        });
+    }
+
+    // Step 1: send OTP
+    const upgradeCode = generateUniqueOtp();
+    const expires     = Date.now() + 10 * 60 * 1000;
+    otpStore.set(email.toLowerCase() + ':upgrade', { code: upgradeCode, expires, newPlan });
+
+    let sent = false;
+    try { sent = await sendVerificationEmail(email, account.name, upgradeCode); } catch (e) {
+        console.error('Upgrade OTP email error:', e.message);
+    }
+    res.json({
+        requiresCode: true, sent,
+        devCode: (sent || process.env.NODE_ENV === 'production') ? undefined : upgradeCode,
+        message: sent
+            ? `Verification code sent to ${email}. Enter it to confirm the upgrade.`
+            : 'SMTP not configured — use this code to continue:',
+    });
+});
+
+// CHANGE CREDENTIALS
+// • No newPassword + credentials_changed=1  → send OTP (step 1)
+// • newPassword + credentials_changed=0     → free one-time change (no OTP needed)
+// • newPassword + credentials_changed=1 + code → verify OTP, then change
+app.post('/api/change-credentials', otpLimiter, async (req, res) => {
+    const { email, newUsername, newPassword, code } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    const account = await dbGet('SELECT * FROM accounts WHERE email = ?', [email.toLowerCase()]);
+    if (!account) return res.status(404).json({ error: 'Account not found.' });
+
+    // Step 1 for verified accounts: just send OTP (caller provides no newPassword yet)
+    if (account.credentials_changed && !code && !newPassword) {
+        const otpCode = generateUniqueOtp();
+        const expires = Date.now() + 10 * 60 * 1000;
+        otpStore.set(email.toLowerCase() + ':credchange', { code: otpCode, expires });
+
+        let sent = false;
+        try { sent = await sendVerificationEmail(email, account.name, otpCode); } catch (e) {
+            console.error('Credential-change OTP error:', e.message);
+        }
+        return res.json({
+            requiresCode: true, sent,
+            devCode: (sent || process.env.NODE_ENV === 'production') ? undefined : otpCode,
+            message: sent
+                ? `Verification code sent to ${email}.`
+                : 'SMTP not configured — use this code to continue:',
+        });
+    }
+
+    if (!newPassword) return res.status(400).json({ error: 'New password is required.' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+    // Validate new username if provided
+    if (newUsername) {
+        if (!/^[a-zA-Z0-9._-]{3,30}$/.test(newUsername))
+            return res.status(400).json({ error: 'Username may only contain letters, numbers, dots, dashes, underscores (3–30 chars).' });
+        const taken = await dbGet('SELECT id FROM accounts WHERE username = ? AND id != ?', [newUsername, account.id]);
+        if (taken) return res.status(409).json({ error: 'That username is already taken. Please choose another.' });
+    }
+
+    const finalUsername = newUsername || account.username;
+    const pwdHash       = hashPassword(newPassword);
+
+    // Free first-time change — no OTP (user just verified email during registration / login)
+    if (!account.credentials_changed) {
+        await dbRun('UPDATE accounts SET username = ?, password_hash = ?, credentials_changed = 1 WHERE id = ?',
+            [finalUsername, pwdHash, account.id]);
+        try { await sendCredentialsEmail(email, account.name, finalUsername, newPassword); } catch {}
+        return res.json({ success: true, username: finalUsername });
+    }
+
+    // OTP-verified change
+    if (!code) return res.status(400).json({ error: 'Verification code is required.' });
+    const entry = otpStore.get(email.toLowerCase() + ':credchange');
+    if (!entry) return res.status(400).json({ error: 'No pending verification. Please request a new code.' });
+    if (Date.now() > entry.expires) {
+        otpStore.delete(email.toLowerCase() + ':credchange');
+        return res.status(400).json({ error: 'Code expired. Please request a new one.' });
+    }
+    if (String(entry.code) !== String(code).trim())
+        return res.status(400).json({ error: 'Incorrect code. Please try again.' });
+
+    otpStore.delete(email.toLowerCase() + ':credchange');
+    await dbRun('UPDATE accounts SET username = ?, password_hash = ? WHERE id = ?',
+        [finalUsername, pwdHash, account.id]);
+    try { await sendCredentialsEmail(email, account.name, finalUsername, newPassword); } catch {}
+    return res.json({ success: true, username: finalUsername });
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));

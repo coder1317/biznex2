@@ -1,4 +1,4 @@
-const router = require('express').Router();
+  const router = require('express').Router();
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 module.exports = function createRouter(db) {

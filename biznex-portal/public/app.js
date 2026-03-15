@@ -33,6 +33,17 @@ function showPage(id) {
         if (regErr) regErr.style.display = 'none';
         setRegStep(1);
     }
+    // Reset login flow to step 1
+    if (id === 'login') {
+        const ls1 = document.getElementById('loginStep1');
+        const ls2 = document.getElementById('loginStep2');
+        if (ls1) ls1.style.display = 'block';
+        if (ls2) ls2.style.display = 'none';
+        const le = document.getElementById('loginError');
+        if (le) le.style.display = 'none';
+        const loe = document.getElementById('loginOtpError');
+        if (loe) loe.style.display = 'none';
+    }
 }
 
 /* ── Plan selection ──────────────────────────────────────────────────────────── */
@@ -228,7 +239,7 @@ function showSuccessPage(data) {
 
     const emailEl = document.getElementById('emailStatus');
     if (data.emailSent) {
-        emailEl.textContent = `✉️ License key also sent to ${data.account?.email}.`;
+        emailEl.textContent = `✉️ License key & credentials sent to ${data.account?.email}.`;
         emailEl.className   = 'alert success';
         emailEl.style.display = 'block';
     } else if (data.emailNote) {
@@ -237,6 +248,18 @@ function showSuccessPage(data) {
         emailEl.style.display = 'block';
     } else {
         emailEl.style.display = 'none';
+    }
+
+    // Show generated username (password is only in the email)
+    const credsEl = document.getElementById('successCredentials');
+    const unameEl = document.getElementById('successUsername');
+    if (credsEl) {
+        if (data.username) {
+            if (unameEl) unameEl.textContent = data.username;
+            credsEl.style.display = 'block';
+        } else {
+            credsEl.style.display = 'none';
+        }
     }
 
     // Reset copy button
@@ -270,7 +293,15 @@ function goToDashboard() {
     showPage('dashboard');
 }
 
-/* ── Login ───────────────────────────────────────────────────────────────────── */
+/* ── Login (2-step OTP) ──────────────────────────────────────────────────────── */
+// Build a normalised session from a server response (handles both {key} and {keys} shapes)
+function buildSession(data) {
+    const keys     = data.keys || (data.key ? [data.key] : []);
+    const latestKey = keys.length ? keys[keys.length - 1] : null;
+    return { account: data.account, key: latestKey, keys, stores: data.stores || [] };
+}
+
+// Step 1: submit email → server sends OTP
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
@@ -285,19 +316,124 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await res.json();
 
         if (!res.ok) {
-            err.textContent = data.error || 'Login failed.';
-            err.className   = 'alert error';
+            err.textContent   = data.error || 'Login failed.';
+            err.className     = 'alert error';
             err.style.display = 'block';
             return;
         }
 
-        currentSession = data;
-        populateDashboard(data);
+        if (data.requiresCode) {
+            document.getElementById('loginStep1').style.display = 'none';
+            document.getElementById('loginStep2').style.display = 'block';
+            document.getElementById('loginOtpSubtitle').textContent = data.message;
+            const devBox = document.getElementById('loginDevCodeBox');
+            if (data.devCode) {
+                document.getElementById('loginDevCodeVal').textContent = data.devCode;
+                devBox.style.display = 'block';
+            } else {
+                devBox.style.display = 'none';
+            }
+            initLoginOtpBoxes();
+            setTimeout(() => document.getElementById('login-otp-0')?.focus(), 100);
+            showToast('Code sent to ' + email, 'success');
+            return;
+        }
+
+        // Fallback if server ever returns session directly
+        const session = buildSession(data);
+        currentSession = session;
+        populateDashboard(session);
         showPage('dashboard');
     } catch (ex) {
-        err.textContent = 'Network error: ' + ex.message;
-        err.className = 'alert error';
+        err.textContent   = 'Network error: ' + ex.message;
+        err.className     = 'alert error';
         err.style.display = 'block';
+    }
+});
+
+// Helper: init OTP boxes for login step 2
+function initLoginOtpBoxes() {
+    document.querySelectorAll('#loginOtpForm .otp-box').forEach((box, idx) => {
+        const fresh = box.cloneNode(true);
+        box.parentNode.replaceChild(fresh, box);
+    });
+    document.querySelectorAll('#loginOtpForm .otp-box').forEach((box, idx) => {
+        const all = document.querySelectorAll('#loginOtpForm .otp-box');
+        box.addEventListener('input', () => {
+            box.value = box.value.replace(/\D/g, '');
+            if (box.value && idx < all.length - 1) all[idx + 1].focus();
+        });
+        box.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !box.value && idx > 0) all[idx - 1].focus();
+            if (e.key === 'ArrowLeft'  && idx > 0) all[idx - 1].focus();
+            if (e.key === 'ArrowRight' && idx < all.length - 1) all[idx + 1].focus();
+        });
+        box.addEventListener('paste', e => {
+            const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+            if (pasted.length >= 6) {
+                e.preventDefault();
+                document.querySelectorAll('#loginOtpForm .otp-box').forEach((b, i) => { b.value = pasted[i] || ''; });
+                all[5].focus();
+            }
+        });
+    });
+}
+
+function backToLoginStep1() {
+    document.getElementById('loginStep2').style.display = 'none';
+    document.getElementById('loginStep1').style.display = 'block';
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loginOtpError').style.display = 'none';
+    [0,1,2,3,4,5].forEach(i => { const b = document.getElementById('login-otp-' + i); if (b) b.value = ''; });
+}
+
+// Step 2: verify OTP → get account + keys
+document.getElementById('loginOtpForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const code  = [0,1,2,3,4,5].map(i => document.getElementById('login-otp-' + i)?.value || '').join('');
+    const btn   = document.getElementById('loginVerifyBtn');
+    const err   = document.getElementById('loginOtpError');
+
+    if (code.length < 6) {
+        err.textContent = 'Please enter all 6 digits.';
+        err.className   = 'alert error';
+        err.style.display = 'block';
+        return;
+    }
+    err.style.display = 'none';
+    btn.disabled = true;
+    document.getElementById('loginVerifyBtnText').innerHTML = '<span class="spinner"></span>Verifying...';
+
+    try {
+        const res  = await fetch(`${API}/api/login`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            [0,1,2,3,4,5].forEach(i => { const b = document.getElementById('login-otp-' + i); if (b) b.value = ''; });
+            document.getElementById('login-otp-0')?.focus();
+            err.textContent   = data.error || 'Verification failed.';
+            err.className     = 'alert error';
+            err.style.display = 'block';
+            btn.disabled = false;
+            document.getElementById('loginVerifyBtnText').textContent = 'Verify & Sign In →';
+            return;
+        }
+
+        const session = buildSession(data);
+        currentSession = session;
+        populateDashboard(session);
+        showPage('dashboard');
+        backToLoginStep1(); // reset for next time
+    } catch (ex) {
+        err.textContent   = 'Network error: ' + ex.message;
+        err.className     = 'alert error';
+        err.style.display = 'block';
+        btn.disabled      = false;
+        document.getElementById('loginVerifyBtnText').textContent = 'Verify & Sign In →';
     }
 });
 
@@ -341,6 +477,12 @@ function populateDashboard(session) {
 
     // License tab
     renderLicenseDetail(key, account);
+
+    // Upgrade tab
+    renderUpgradeTab(key, account);
+
+    // Credentials tab
+    renderCredentialsTab(account);
 
     // Switch to overview
     dashTab('overview');
@@ -445,6 +587,497 @@ function renderLicenseDetail(key, account) {
                 </div>
             </div>
         </div>`;
+}
+/* ── Upgrade Plan tab ─────────────────────────────────────────────────────────────── */
+let selectedUpgradePlan = null;
+
+const UPGRADE_PLAN_INFO = {
+    starter:    { label: 'Starter',    icon: '🏪', color: '#818cf8', desc: '1 device · single store' },
+    business:   { label: 'Business',   icon: '🏬', color: '#38bdf8', desc: 'Up to 10 devices · multi-store' },
+    enterprise: { label: 'Enterprise', icon: '🏒', color: '#34d399', desc: 'Unlimited devices & stores' },
+};
+
+function renderUpgradeTab(key, account) {
+    const el = document.getElementById('upgradeContent');
+    if (!el) return;
+    const current    = key?.plan || 'starter';
+    const planOrder  = ['starter', 'business', 'enterprise'];
+    const higherPlans = planOrder.filter(p => planOrder.indexOf(p) > planOrder.indexOf(current));
+
+    if (higherPlans.length === 0) {
+        el.innerHTML = `
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:24px;text-align:center;max-width:480px;">
+                <div style="font-size:32px;margin-bottom:10px;">🏆</div>
+                <div style="font-size:16px;font-weight:700;color:#34d399;margin-bottom:6px;">You're on the Enterprise Plan</div>
+                <div style="font-size:13px;color:#64748b;">You have the highest available plan. Enjoy unlimited access!</div>
+            </div>`;
+        return;
+    }
+
+    const currentMeta = UPGRADE_PLAN_INFO[current] || UPGRADE_PLAN_INFO.starter;
+    el.innerHTML = `
+        <div style="max-width:520px;">
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+                <span style="font-size:22px;">${currentMeta.icon}</span>
+                <div>
+                    <div style="font-size:11px;color:#64748b;">Current plan</div>
+                    <div style="font-size:15px;font-weight:700;color:${currentMeta.color};">${currentMeta.label}</div>
+                </div>
+            </div>
+            <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">Select a plan to upgrade to. A verification code will be sent to <strong>${esc(account.email)}</strong> to confirm.</p>
+            <div id="upgradePlanList" style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+                ${higherPlans.map(p => {
+                    const pm = UPGRADE_PLAN_INFO[p];
+                    return `<div class="upgrade-plan-card" id="upc-${p}" onclick="selectUpgradePlan('${p}')"
+                        style="background:#1e293b;border:2px solid #334155;border-radius:10px;padding:14px 18px;cursor:pointer;transition:border-color 0.15s;display:flex;align-items:center;gap:14px;">
+                        <span style="font-size:24px;">${pm.icon}</span>
+                        <div style="flex:1;">
+                            <div style="font-size:15px;font-weight:700;color:${pm.color};">${pm.label}</div>
+                            <div style="font-size:12px;color:#64748b;">${pm.desc}</div>
+                        </div>
+                        <div id="upc-radio-${p}" style="width:18px;height:18px;border-radius:50%;border:2px solid #475569;flex-shrink:0;"></div>
+                    </div>`;
+                }).join('')}
+            </div>
+            <button class="btn-primary" id="upgradeRequestBtn" onclick="requestUpgrade()" style="width:100%;">
+                <span id="upgradeRequestBtnText">Send Verification Code →</span>
+            </button>
+            <div id="upgradeError" class="alert error" style="display:none;margin-top:12px;"></div>
+
+            <div id="upgradeStep2" style="display:none;margin-top:20px;">
+                <p class="form-sub" id="upgradeOtpSubtitle">Enter the 6-digit code sent to your email.</p>
+                <div id="upgradeDevCodeBox" style="display:none;" class="dev-code-box">
+                    <div class="dev-code-label">Dev Mode — SMTP not configured</div>
+                    <div class="dev-code-val" id="upgradeDevCodeVal"></div>
+                    <div class="dev-code-hint">Copy this code into the field below</div>
+                </div>
+                <form id="upgradeOtpForm" autocomplete="off">
+                    <div class="form-group">
+                        <label>6-Digit Verification Code</label>
+                        <div class="otp-row">
+                            <input class="otp-box" id="upg-otp-0" maxlength="1" inputmode="numeric" />
+                            <input class="otp-box" id="upg-otp-1" maxlength="1" inputmode="numeric" />
+                            <input class="otp-box" id="upg-otp-2" maxlength="1" inputmode="numeric" />
+                            <span class="otp-divider">–</span>
+                            <input class="otp-box" id="upg-otp-3" maxlength="1" inputmode="numeric" />
+                            <input class="otp-box" id="upg-otp-4" maxlength="1" inputmode="numeric" />
+                            <input class="otp-box" id="upg-otp-5" maxlength="1" inputmode="numeric" />
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary" id="upgradeVerifyBtn" style="width:100%;">
+                        <span id="upgradeVerifyBtnText">Confirm Upgrade →</span>
+                    </button>
+                </form>
+                <div id="upgradeOtpError" class="alert error" style="display:none;margin-top:10px;"></div>
+            </div>
+        </div>`;
+
+    selectUpgradePlan(higherPlans[0]);
+    document.getElementById('upgradeOtpForm').addEventListener('submit', submitUpgradeOtp);
+}
+
+function selectUpgradePlan(plan) {
+    selectedUpgradePlan = plan;
+    document.querySelectorAll('.upgrade-plan-card').forEach(c => { c.style.borderColor = '#334155'; });
+    document.querySelectorAll('[id^="upc-radio-"]').forEach(r => { r.style.background = 'transparent'; r.style.borderColor = '#475569'; });
+    const card  = document.getElementById('upc-' + plan);
+    const radio = document.getElementById('upc-radio-' + plan);
+    if (card)  card.style.borderColor = '#4f46e5';
+    if (radio) { radio.style.background = '#4f46e5'; radio.style.borderColor = '#4f46e5'; }
+}
+
+async function requestUpgrade() {
+    if (!selectedUpgradePlan || !currentSession) return;
+    const btn = document.getElementById('upgradeRequestBtn');
+    const err = document.getElementById('upgradeError');
+    err.style.display = 'none';
+    btn.disabled = true;
+    document.getElementById('upgradeRequestBtnText').innerHTML = '<span class="spinner"></span>Sending code...';
+
+    try {
+        const res  = await fetch(`${API}/api/upgrade-plan`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: currentSession.account.email, newPlan: selectedUpgradePlan }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            err.textContent   = data.error || 'Failed to send code.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            document.getElementById('upgradeRequestBtnText').textContent = 'Send Verification Code →';
+            return;
+        }
+
+        document.getElementById('upgradeStep2').style.display = 'block';
+        document.getElementById('upgradeOtpSubtitle').textContent = data.message;
+        const devBox = document.getElementById('upgradeDevCodeBox');
+        if (data.devCode) {
+            document.getElementById('upgradeDevCodeVal').textContent = data.devCode;
+            devBox.style.display = 'block';
+        } else {
+            devBox.style.display = 'none';
+        }
+        initUpgradeOtpBoxes();
+        setTimeout(() => document.getElementById('upg-otp-0')?.focus(), 100);
+        showToast('Code sent to ' + currentSession.account.email, 'success');
+        btn.disabled = false;
+        document.getElementById('upgradeRequestBtnText').textContent = 'Resend Code';
+    } catch (ex) {
+        err.textContent   = 'Network error: ' + ex.message;
+        err.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('upgradeRequestBtnText').textContent = 'Send Verification Code →';
+    }
+}
+
+function initUpgradeOtpBoxes() {
+    document.querySelectorAll('#upgradeOtpForm .otp-box').forEach((box, idx) => {
+        const fresh = box.cloneNode(true);
+        box.parentNode.replaceChild(fresh, box);
+    });
+    document.querySelectorAll('#upgradeOtpForm .otp-box').forEach((box, idx) => {
+        const all = document.querySelectorAll('#upgradeOtpForm .otp-box');
+        box.addEventListener('input', () => {
+            box.value = box.value.replace(/\D/g, '');
+            if (box.value && idx < all.length - 1) all[idx + 1].focus();
+        });
+        box.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !box.value && idx > 0) all[idx - 1].focus();
+        });
+        box.addEventListener('paste', e => {
+            const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+            if (pasted.length >= 6) {
+                e.preventDefault();
+                document.querySelectorAll('#upgradeOtpForm .otp-box').forEach((b, i) => { b.value = pasted[i] || ''; });
+                all[5].focus();
+            }
+        });
+    });
+}
+
+function getUpgradeOtpValue() {
+    return [0,1,2,3,4,5].map(i => document.getElementById('upg-otp-' + i)?.value || '').join('');
+}
+
+async function submitUpgradeOtp(e) {
+    e.preventDefault();
+    const code = getUpgradeOtpValue();
+    const btn  = document.getElementById('upgradeVerifyBtn');
+    const err  = document.getElementById('upgradeOtpError');
+
+    if (code.length < 6) {
+        err.textContent   = 'Please enter all 6 digits.';
+        err.className     = 'alert error';
+        err.style.display = 'block';
+        return;
+    }
+    err.style.display = 'none';
+    btn.disabled = true;
+    document.getElementById('upgradeVerifyBtnText').innerHTML = '<span class="spinner"></span>Upgrading...';
+
+    try {
+        const res  = await fetch(`${API}/api/upgrade-plan`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: currentSession.account.email, code, newPlan: selectedUpgradePlan }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            document.querySelectorAll('#upgradeOtpForm .otp-box').forEach(b => { b.value = ''; });
+            document.getElementById('upg-otp-0')?.focus();
+            err.textContent   = data.error || 'Upgrade failed.';
+            err.className     = 'alert error';
+            err.style.display = 'block';
+            btn.disabled = false;
+            document.getElementById('upgradeVerifyBtnText').textContent = 'Confirm Upgrade →';
+            return;
+        }
+
+        // Refresh session with new key
+        try {
+            const acctRes = await fetch(`${API}/api/account/${encodeURIComponent(currentSession.account.email)}`);
+            if (acctRes.ok) {
+                const acctData = await acctRes.json();
+                currentSession = buildSession(acctData);
+            }
+        } catch {}
+
+        showToast(`🎉 Upgraded to ${data.planLabel}! New key: ${data.key}`, 'success', 8000);
+        populateDashboard(currentSession);
+        dashTab('license');
+    } catch (ex) {
+        err.textContent   = 'Network error: ' + ex.message;
+        err.className     = 'alert error';
+        err.style.display = 'block';
+        btn.disabled      = false;
+        document.getElementById('upgradeVerifyBtnText').textContent = 'Confirm Upgrade →';
+    }
+}
+        btn.disabled      = false;
+        document.getElementById('upgradeVerifyBtnText').textContent = 'Confirm Upgrade →';
+    }
+}
+
+/* ── Credentials Tab ─────────────────────────────────────────────────────────── */
+function renderCredentialsTab(account) {
+    const el = document.getElementById('credentialsContent');
+    if (!el) return;
+    const changed = account.credentials_changed;
+
+    if (!changed) {
+        // One-time free change — no OTP required (user just verified email during registration)
+        el.innerHTML = `
+            <div style="max-width:480px;">
+                <div style="background:#f59e0b18;border:1px solid #f59e0b40;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start;">
+                    <span style="font-size:22px;">⚠️</span>
+                    <div>
+                        <div style="font-size:13px;font-weight:700;color:#f59e0b;margin-bottom:4px;">One-time credential setup available</div>
+                        <div style="font-size:12px;color:#94a3b8;line-height:1.6;">Your credentials were auto-generated and emailed to you. You can set your own username and password <em>right now without a verification code</em> — this free-change window is <strong>available once only</strong>. After this, any changes will require email verification.</div>
+                    </div>
+                </div>
+                <form id="credChangeForm" onsubmit="submitCredentialChange(event)">
+                    <div class="form-group">
+                        <label>New Username <span style="font-size:10px;color:#64748b;">(optional — leave blank to keep current)</span></label>
+                        <input type="text" id="credNewUsername" placeholder="e.g. john.smith" autocomplete="off"
+                            style="width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;" />
+                        <div style="font-size:11px;color:#64748b;margin-top:4px;">Current: <strong id="credCurrentUsername" style="color:#a5b4fc;font-family:monospace;">${esc(account.username || '(not set)')}</strong></div>
+                    </div>
+                    <div class="form-group" style="margin-top:14px;">
+                        <label>New Password</label>
+                        <input type="password" id="credNewPassword" placeholder="Choose a strong password" required autocomplete="new-password"
+                            style="width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;" />
+                    </div>
+                    <div class="form-group" style="margin-top:14px;">
+                        <label>Confirm Password</label>
+                        <input type="password" id="credNewPasswordConfirm" placeholder="Repeat your new password" required autocomplete="new-password"
+                            style="width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;" />
+                    </div>
+                    <div id="credChangeError" class="alert error" style="display:none;margin-top:12px;"></div>
+                    <button type="submit" class="btn-primary" id="credChangeBtn" style="width:100%;margin-top:16px;">
+                        <span id="credChangeBtnText">Save My Credentials →</span>
+                    </button>
+                </form>
+                <p style="font-size:11px;color:#475569;margin-top:12px;">After saving, any future changes will require email verification.</p>
+            </div>`;
+    } else {
+        // Must use OTP for changes
+        el.innerHTML = `
+            <div style="max-width:480px;">
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px 18px;margin-bottom:20px;">
+                    <div style="font-size:11px;color:#64748b;margin-bottom:4px;">Current username</div>
+                    <div style="font-size:15px;font-weight:600;color:#a5b4fc;font-family:monospace;">${esc(account.username || '—')}</div>
+                </div>
+
+                <div id="credStep1">
+                    <p style="font-size:13px;color:#94a3b8;margin-bottom:16px;">
+                        To change your username or password, we need to verify your identity.<br>
+                        A 6-digit code will be sent to <strong>${esc(account.email)}</strong>.
+                    </p>
+                    <button class="btn-primary" onclick="requestCredentialChangeOtp()" id="credOtpRequestBtn" style="width:100%;">
+                        <span id="credOtpRequestBtnText">Send Verification Code →</span>
+                    </button>
+                    <div id="credOtpRequestError" class="alert error" style="display:none;margin-top:10px;"></div>
+                </div>
+
+                <div id="credStep2" style="display:none;margin-top:24px;border-top:1px solid #1e293b;padding-top:20px;">
+                    <p class="form-sub" id="credOtpSubtitle">Enter the 6-digit code sent to your email.</p>
+                    <div id="credDevCodeBox" style="display:none;" class="dev-code-box">
+                        <div class="dev-code-label">Dev Mode — SMTP not configured</div>
+                        <div class="dev-code-val" id="credDevCodeVal"></div>
+                        <div class="dev-code-hint">Copy this code into the field below</div>
+                    </div>
+                    <div class="otp-row" style="margin-bottom:18px;">
+                        <input class="otp-box" id="cred-otp-0" maxlength="1" inputmode="numeric" />
+                        <input class="otp-box" id="cred-otp-1" maxlength="1" inputmode="numeric" />
+                        <input class="otp-box" id="cred-otp-2" maxlength="1" inputmode="numeric" />
+                        <span class="otp-divider">–</span>
+                        <input class="otp-box" id="cred-otp-3" maxlength="1" inputmode="numeric" />
+                        <input class="otp-box" id="cred-otp-4" maxlength="1" inputmode="numeric" />
+                        <input class="otp-box" id="cred-otp-5" maxlength="1" inputmode="numeric" />
+                    </div>
+                    <form id="credOtpChangeForm" onsubmit="submitCredentialChange(event)">
+                        <div class="form-group">
+                            <label>New Username <span style="font-size:10px;color:#64748b;">(optional)</span></label>
+                            <input type="text" id="credNewUsername" placeholder="Leave blank to keep current" autocomplete="off"
+                                style="width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;" />
+                        </div>
+                        <div class="form-group" style="margin-top:14px;">
+                            <label>New Password</label>
+                            <input type="password" id="credNewPassword" placeholder="Choose a strong password" required autocomplete="new-password"
+                                style="width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;" />
+                        </div>
+                        <div class="form-group" style="margin-top:14px;">
+                            <label>Confirm Password</label>
+                            <input type="password" id="credNewPasswordConfirm" placeholder="Repeat password" required autocomplete="new-password"
+                                style="width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:14px;box-sizing:border-box;" />
+                        </div>
+                        <div id="credChangeError" class="alert error" style="display:none;margin-top:12px;"></div>
+                        <button type="submit" class="btn-primary" id="credChangeBtn" style="width:100%;margin-top:16px;">
+                            <span id="credChangeBtnText">Update Credentials →</span>
+                        </button>
+                    </form>
+                    <div id="credOtpError" class="alert error" style="display:none;margin-top:10px;"></div>
+                </div>
+            </div>`;
+        initCredOtpBoxes();
+    }
+}
+
+async function requestCredentialChangeOtp() {
+    if (!currentSession) return;
+    const btn = document.getElementById('credOtpRequestBtn');
+    const err = document.getElementById('credOtpRequestError');
+    err.style.display = 'none';
+    btn.disabled = true;
+    document.getElementById('credOtpRequestBtnText').innerHTML = '<span class="spinner"></span>Sending code...';
+
+    try {
+        const res  = await fetch(`${API}/api/change-credentials`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: currentSession.account.email }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            err.textContent   = data.error || 'Failed to send code.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            document.getElementById('credOtpRequestBtnText').textContent = 'Send Verification Code →';
+            return;
+        }
+
+        document.getElementById('credStep1').style.display = 'none';
+        document.getElementById('credStep2').style.display = 'block';
+        document.getElementById('credOtpSubtitle').textContent = data.message;
+        const devBox = document.getElementById('credDevCodeBox');
+        if (data.devCode) {
+            document.getElementById('credDevCodeVal').textContent = data.devCode;
+            devBox.style.display = 'block';
+        } else {
+            devBox.style.display = 'none';
+        }
+        initCredOtpBoxes();
+        setTimeout(() => document.getElementById('cred-otp-0')?.focus(), 100);
+        showToast('Code sent to ' + currentSession.account.email, 'success');
+        btn.disabled = false;
+        document.getElementById('credOtpRequestBtnText').textContent = 'Send Verification Code →';
+    } catch (ex) {
+        err.textContent   = 'Network error: ' + ex.message;
+        err.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('credOtpRequestBtnText').textContent = 'Send Verification Code →';
+    }
+}
+
+function initCredOtpBoxes() {
+    const sel = '#credStep2 .otp-box';
+    document.querySelectorAll(sel).forEach((box) => {
+        const fresh = box.cloneNode(true);
+        box.parentNode.replaceChild(fresh, box);
+    });
+    document.querySelectorAll(sel).forEach((box, idx) => {
+        const all = document.querySelectorAll(sel);
+        box.addEventListener('input', () => {
+            box.value = box.value.replace(/\D/g, '');
+            if (box.value && idx < all.length - 1) all[idx + 1].focus();
+        });
+        box.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !box.value && idx > 0) all[idx - 1].focus();
+            if (e.key === 'ArrowLeft'  && idx > 0) all[idx - 1].focus();
+            if (e.key === 'ArrowRight' && idx < all.length - 1) all[idx + 1].focus();
+        });
+        box.addEventListener('paste', e => {
+            const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+            if (pasted.length >= 6) {
+                e.preventDefault();
+                document.querySelectorAll(sel).forEach((b, i) => { b.value = pasted[i] || ''; });
+                all[5].focus();
+            }
+        });
+    });
+}
+
+async function submitCredentialChange(event) {
+    event.preventDefault();
+    if (!currentSession) return;
+
+    const newUsername = (document.getElementById('credNewUsername')?.value || '').trim();
+    const newPassword = document.getElementById('credNewPassword')?.value || '';
+    const confirm     = document.getElementById('credNewPasswordConfirm')?.value || '';
+    const err         = document.getElementById('credChangeError');
+
+    err.style.display = 'none';
+    if (newPassword !== confirm) {
+        err.textContent = 'Passwords do not match.';
+        err.className   = 'alert error';
+        err.style.display = 'block';
+        return;
+    }
+    if (newPassword.length < 6) {
+        err.textContent = 'Password must be at least 6 characters.';
+        err.className   = 'alert error';
+        err.style.display = 'block';
+        return;
+    }
+
+    const changed = currentSession.account.credentials_changed;
+    const code    = changed
+        ? [0,1,2,3,4,5].map(i => document.getElementById('cred-otp-' + i)?.value || '').join('')
+        : undefined;
+
+    if (changed && (!code || code.length < 6)) {
+        err.textContent = 'Please enter the 6-digit verification code.';
+        err.className   = 'alert error';
+        err.style.display = 'block';
+        return;
+    }
+
+    const btn = document.getElementById('credChangeBtn');
+    btn.disabled = true;
+    document.getElementById('credChangeBtnText').innerHTML = '<span class="spinner"></span>Saving...';
+
+    try {
+        const body = { email: currentSession.account.email, newPassword };
+        if (newUsername) body.newUsername = newUsername;
+        if (code)        body.code        = code;
+
+        const res  = await fetch(`${API}/api/change-credentials`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            if (changed) {
+                [0,1,2,3,4,5].forEach(i => { const b = document.getElementById('cred-otp-' + i); if (b) b.value = ''; });
+                document.getElementById('cred-otp-0')?.focus();
+            }
+            err.textContent   = data.error || 'Failed to update credentials.';
+            err.className     = 'alert error';
+            err.style.display = 'block';
+            btn.disabled = false;
+            document.getElementById('credChangeBtnText').textContent = changed ? 'Update Credentials →' : 'Save My Credentials →';
+            return;
+        }
+
+        // Update local session so the tab re-renders correctly
+        currentSession.account.credentials_changed = 1;
+        if (data.username) currentSession.account.username = data.username;
+
+        showToast('✅ Credentials updated! Check your email for confirmation.', 'success', 4000);
+        renderCredentialsTab(currentSession.account);
+
+        // Reflect new username in sidebar
+        const dashUsernameEl = document.getElementById('dashUsername');
+        if (dashUsernameEl && data.username) dashUsernameEl.textContent = data.username;
+    } catch (ex) {
+        err.textContent   = 'Network error: ' + ex.message;
+        err.className     = 'alert error';
+        err.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('credChangeBtnText').textContent = changed ? 'Update Credentials →' : 'Save My Credentials →';
+    }
 }
 
 /* ── Dashboard tabs ──────────────────────────────────────────────────────────── */
