@@ -6,6 +6,7 @@ const rateLimit  = require('express-rate-limit');
 const path       = require('path');
 const crypto     = require('crypto');
 const http       = require('http');
+const jwt        = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const sqlite3    = require('sqlite3').verbose();
 
@@ -103,6 +104,7 @@ async function syncKeyToBOS(key, plan, customerName, customerEmail) {
     const baseUrl     = process.env.LICENSE_SERVER_URL    || 'http://localhost:4000';
     const adminSecret = process.env.LICENSE_ADMIN_SECRET  || 'biznex-admin-2026';
     const payload     = JSON.stringify({ key, plan, customerName, customerEmail, adminSecret });
+    console.log(`[bos-sync] Syncing key=${key} to ${baseUrl}`);
     return new Promise((resolve) => {
         try {
             const url = new URL('/api/admin/generate-key', baseUrl);
@@ -112,18 +114,26 @@ async function syncKeyToBOS(key, plan, customerName, customerEmail) {
                 path:     url.pathname,
                 method:   'POST',
                 headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
-                timeout:  3000,
+                timeout:  5000,
             };
             const req = http.request(opts, (res) => {
                 let body = '';
                 res.on('data', c => body += c);
-                res.on('end', () => { try { const p = JSON.parse(body); console.log(`[bos-sync] key=${key} status=${res.statusCode}${p.alreadyExisted ? ' (existed)' : ''}`); } catch {} resolve(res.statusCode); });
+                res.on('end', () => { 
+                    try { 
+                        const p = JSON.parse(body);
+                        console.log(`[bos-sync] ✅ key=${key} status=${res.statusCode} plan=${p.plan}${p.alreadyExisted ? ' (existed)' : ''}`); 
+                    } catch (e) {
+                        console.log(`[bos-sync] response status=${res.statusCode} body=${body}`);
+                    } 
+                    resolve(res.statusCode); 
+                });
             });
-            req.on('timeout', () => { req.destroy(); console.warn('[bos-sync] timeout'); resolve(null); });
-            req.on('error',   () => { console.warn('[bos-sync] error — BOS server unreachable'); resolve(null); });
+            req.on('timeout', () => { req.destroy(); console.warn('[bos-sync] ⏱ timeout'); resolve(null); });
+            req.on('error',   (e) => { console.warn('[bos-sync] ❌ error:', e.message); resolve(null); });
             req.write(payload);
             req.end();
-        } catch (e) { console.warn('[bos-sync] failed:', e.message); resolve(null); }
+        } catch (e) { console.warn('[bos-sync] ❌ failed:', e.message); resolve(null); }
     });
 }
 
@@ -223,136 +233,146 @@ app.use(cors({ origin: process.env.PORTAL_ORIGIN || true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rate limiting
-const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true });
-const otpLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 10,  standardHeaders: true,
+// Rate limiting (increased for development/testing)
+const generalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true });
+const otpLimiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: 100,  standardHeaders: true,
     message: { error: 'Too many requests. Please wait 15 minutes before trying again.' } });
-const loginLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 10,  standardHeaders: true,
+const loginLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 100,  standardHeaders: true,
     message: { error: 'Too many login attempts. Please wait 15 minutes.' } });
 
 app.use(generalLimiter);
 
 /* ── API routes ───────────────────────────────────────────────────────────── */
 
-// STEP 1 — Send verification code (for new registrations)
-app.post('/api/send-verification', otpLimiter, async (req, res) => {
-    const { name, email, plan = 'starter' } = req.body;
-    if (!name || !email) return res.status(400).json({ error: 'Name and email are required.' });
-    if (!PLAN_MAP[plan])  return res.status(400).json({ error: 'Invalid plan.' });
+// ════════════════════════════════════════════════════════════════════════════
+// SIGNUP — Simple: email + password directly (no OTP)
+// ════════════════════════════════════════════════════════════════════════════
 
-    const code    = generateUniqueOtp();
-    const expires = Date.now() + 10 * 60 * 1000;
-    otpStore.set(email.toLowerCase(), { code, expires, name, plan });
+app.post('/api/signup', async (req, res) => {
+    const { email, password, plan = 'starter' } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    if (!PLAN_MAP[plan]) return res.status(400).json({ error: 'Invalid plan.' });
 
-    let sent = false;
-    try { sent = await sendVerificationEmail(email, name, code); } catch (e) {
-        console.error('OTP email error:', e.message);
-    }
-
-    res.json({
-        sent,
-        // Only expose devCode when SMTP is not configured (development mode)
-        devCode: (sent || process.env.NODE_ENV === 'production') ? undefined : code,
-        message: sent
-            ? `Verification code sent to ${email}. Check your inbox.`
-            : 'SMTP not configured — use this code to continue:',
-    });
-});
-
-// STEP 2 — Verify code & create account + key
-app.post('/api/verify-code', otpLimiter, async (req, res) => {
-    const { email, code } = req.body;
-    if (!email || !code) return res.status(400).json({ error: 'Email and code are required.' });
-
-    const entry = otpStore.get(email.toLowerCase());
-    if (!entry)               return res.status(400).json({ error: 'No verification request found. Please request a new code.' });
-    if (Date.now() > entry.expires) {
-        otpStore.delete(email.toLowerCase());
-        return res.status(400).json({ error: 'Code expired. Please request a new one.' });
-    }
-    if (String(entry.code) !== String(code).trim()) {
-        return res.status(400).json({ error: 'Incorrect code. Please try again.' });
-    }
-
-    otpStore.delete(email.toLowerCase());
-    const { name, plan } = entry;
-
+    // Check if email already exists
     const existing = await dbGet('SELECT id FROM accounts WHERE email = ?', [email.toLowerCase()]);
     if (existing) {
-        const k = await dbGet('SELECT * FROM license_keys WHERE account_id = ? LIMIT 1', [existing.id]);
-        return res.status(409).json({ error: 'Email already registered.', key: k || null });
+        return res.status(400).json({ error: 'Email already registered.' });
     }
 
-    const result   = await dbRun('INSERT INTO accounts (name, email) VALUES (?, ?)', [name, email.toLowerCase()]);
-    const acctId   = result.lastID;
-    const key      = generateKey(plan);
-    const meta     = PLAN_MAP[plan];
-    await dbRun('INSERT INTO license_keys (account_id, key, plan, max_devices) VALUES (?, ?, ?, ?)',
-        [acctId, key, plan, meta.maxDevices >= 999999 ? 999999 : meta.maxDevices]);
+    try {
+        // Create the account
+        const result = await dbRun('INSERT INTO accounts (name, email) VALUES (?, ?)', 
+            [email.toLowerCase(), email.toLowerCase()]);
+        const acctId = result.lastID;
 
-    // Auto-generate portal login credentials
-    const username = generateUsername(name);
-    const plainPwd = generatePassword();
-    const pwdHash  = hashPassword(plainPwd);
-    await dbRun('UPDATE accounts SET username = ?, password_hash = ? WHERE id = ?', [username, pwdHash, acctId]);
+        // Hash and set password
+        const pwdHash = hashPassword(password);
+        await dbRun('UPDATE accounts SET password_hash = ? WHERE id = ?', [pwdHash, acctId]);
 
-    const account = await dbGet('SELECT * FROM accounts WHERE id = ?', [acctId]);
-    let emailSent = false;
-    try { emailSent = await sendKeyEmail(email, name, key, plan, { username, password: plainPwd }); } catch {}
-    syncKeyToBOS(key, plan, name, email).catch(() => {});
+        // Generate login credentials
+        const username = generateUsername(email);
+        const appPassword = generatePassword();
+        const appPwdHash = hashPassword(appPassword);
+        await dbRun('UPDATE accounts SET username = ?, password_hash = ?, credentials_changed = 1 WHERE id = ?', 
+            [username, appPwdHash, acctId]);
 
-    res.json({ account, key, plan, planType: meta.planType, maxDevices: meta.maxDevices,
-        username, emailSent,
-        emailNote: emailSent ? null : 'Configure SMTP in .env to enable email delivery.' });
+        // Generate license key
+        const key = generateKey(plan);
+        const meta = PLAN_MAP[plan];
+        await dbRun('INSERT INTO license_keys (account_id, key, plan, max_devices) VALUES (?, ?, ?, ?)',
+            [acctId, key, plan, meta.maxDevices >= 999999 ? 999999 : meta.maxDevices]);
+
+        // Get full account details
+        const account = await dbGet('SELECT * FROM accounts WHERE id = ?', [acctId]);
+
+        // Sync key to BOS (wait for it to complete)
+        const syncStatus = await syncKeyToBOS(key, plan, email, email);
+        console.log(`[signup] Key synced to BOS with status: ${syncStatus}`);
+
+        // Get plan features
+        const planFeatures = {
+            'starter': {
+                max_locations: 1,
+                cloud_sync: true,
+                auto_updates: true,
+                multi_store: false,
+                priority_support: false,
+                advanced_reports: false,
+                custom_branding: false,
+                api_access: false,
+            },
+            'business': {
+                max_locations: 10,
+                cloud_sync: true,
+                auto_updates: true,
+                multi_store: true,
+                priority_support: true,
+                advanced_reports: true,
+                custom_branding: false,
+                api_access: false,
+            },
+            'enterprise': {
+                max_locations: 'Unlimited',
+                cloud_sync: true,
+                auto_updates: true,
+                multi_store: true,
+                priority_support: true,
+                advanced_reports: true,
+                custom_branding: true,
+                api_access: true,
+            },
+        };
+
+        res.json({ 
+            success: true,
+            account: {
+                id: account.id,
+                email: account.email,
+                username: username,
+            },
+            credentials: {
+                username: username,
+                password: appPassword,
+                note: 'Save these credentials - they are needed to access your app'
+            },
+            license: {
+                key, 
+                plan, 
+                planType: meta.planType, 
+                maxDevices: meta.maxDevices,
+            },
+            features: planFeatures[plan],
+            message: 'Account created successfully!'
+        });
+    } catch (err) {
+        console.error('Account creation error:', err);
+        res.status(500).json({ error: 'Failed to create account.' });
+    }
 });
 
-// LOGIN — Step 1: send OTP to email
+// ════════════════════════════════════════════════════════════════════════════
+// LOGIN — email + password 
+// ════════════════════════════════════════════════════════════════════════════
+
 app.post('/api/login', loginLimiter, async (req, res) => {
-    const { email, code } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required.' });
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
 
-    // Step 2: if code provided, verify it and return account/keys
-    if (code) {
-        const entry = otpStore.get(email.toLowerCase() + ':login');
-        if (!entry)               return res.status(400).json({ error: 'No login request found. Please request a new code.' });
-        if (Date.now() > entry.expires) {
-            otpStore.delete(email.toLowerCase() + ':login');
-            return res.status(400).json({ error: 'Code expired. Please request a new one.' });
-        }
-        if (String(entry.code) !== String(code).trim()) {
-            return res.status(400).json({ error: 'Incorrect code. Please try again.' });
-        }
-        otpStore.delete(email.toLowerCase() + ':login');
+    const account = await dbGet('SELECT * FROM accounts WHERE email = ?', [email.toLowerCase()]);
+    if (!account) return res.status(404).json({ error: 'Email not found.' });
+    if (!account.password_hash) return res.status(400).json({ error: 'Password not set for this account.' });
 
-        const account = await dbGet('SELECT * FROM accounts WHERE email = ?', [email.toLowerCase()]);
-        if (!account) return res.status(404).json({ error: 'Account not found.' });
-
-        const keys   = await dbAll('SELECT * FROM license_keys WHERE account_id = ?', [account.id]);
-        const stores = await dbAll('SELECT * FROM stores WHERE account_id = ?', [account.id]);
-        return res.json({ account, keys, stores });
+    // Verify password
+    const [salt, hash] = account.password_hash.split(':');
+    const testHash = crypto.scryptSync(password, salt, 64).toString('hex');
+    if (testHash !== hash) {
+        return res.status(401).json({ error: 'Incorrect password.' });
     }
 
-    // Step 1: account must exist, then send OTP
-    const account = await dbGet('SELECT id, name FROM accounts WHERE email = ?', [email.toLowerCase()]);
-    if (!account) return res.status(404).json({ error: 'No account found for that email.' });
-
-    const loginCode = generateUniqueOtp();
-    const expires   = Date.now() + 10 * 60 * 1000;
-    otpStore.set(email.toLowerCase() + ':login', { code: loginCode, expires });
-
-    let sent = false;
-    try { sent = await sendVerificationEmail(email, account.name, loginCode); } catch (e) {
-        console.error('Login OTP email error:', e.message);
-    }
-
-    res.json({
-        sent,
-        requiresCode: true,
-        devCode: (sent || process.env.NODE_ENV === 'production') ? undefined : loginCode,
-        message: sent
-            ? `Verification code sent to ${email}. Check your inbox.`
-            : 'SMTP not configured — use this code to continue:',
-    });
+    const keys   = await dbAll('SELECT * FROM license_keys WHERE account_id = ?', [account.id]);
+    const stores = await dbAll('SELECT * FROM stores WHERE account_id = ?', [account.id]);
+    res.json({ success: true, account, keys, stores });
 });
 
 app.get('/api/account/:email', async (req, res) => {
@@ -605,6 +625,79 @@ app.post('/api/change-credentials', otpLimiter, async (req, res) => {
         [finalUsername, pwdHash, account.id]);
     try { await sendCredentialsEmail(email, account.name, finalUsername, newPassword); } catch {}
     return res.json({ success: true, username: finalUsername });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLEANUP ROUTINE — Periodically remove expired OTPs from memory
+// ════════════════════════════════════════════════════════════════════════════
+
+setInterval(() => {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [key, entry] of otpStore.entries()) {
+        if (entry.expires && now > entry.expires) {
+            otpStore.delete(key);
+            cleaned++;
+        }
+    }
+    if (cleaned > 0) {
+        console.log(`[portal] Cleaned up ${cleaned} expired OTP entries`);
+    }
+}, 5 * 60 * 1000); // Run every 5 minutes
+
+// ════════════════════════════════════════════════════════════════════════════
+// LICENSE ACTIVATION — Validate license key from app
+// ════════════════════════════════════════════════════════════════════════════
+
+app.post('/api/license/activate', express.json(), async (req, res) => {
+    const { key, device_id, device_name } = req.body;
+    if (!key) return res.status(400).json({ success: false, error: 'License key is required.' });
+
+    try {
+        // Validate key format: BZNX-{PLAN}-{8 HEX}-{8 HEX}
+        const match = key.match(/^BZNX-(STR|BIZ|ENT)-([A-F0-9]{8})-([A-F0-9]{8})$/i);
+        if (!match) {
+            return res.status(400).json({ success: false, error: 'Invalid key format.' });
+        }
+
+        const planCode = match[1].toUpperCase();
+        const planMap = { 'STR': 'starter', 'BIZ': 'business', 'ENT': 'enterprise' };
+        const plan = planMap[planCode];
+
+        // Look up the license key in the database
+        const license = await dbGet('SELECT * FROM license_keys WHERE key = ?', [key]);
+        if (!license) {
+            return res.status(404).json({ success: false, error: 'License key not found or invalid.' });
+        }
+
+        // License is valid — generate a JWT token for offline validation
+        const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
+        const licenseToken = jwt.sign(
+            {
+                key: license.key,
+                plan: license.plan,
+                maxSeats: license.max_devices || 1,
+                accountId: license.account_id,
+                issuedAt: Date.now(),
+            },
+            JWT_SECRET,
+            { expiresIn: '365d' }
+        );
+
+        const meta = PLAN_MAP[plan] || PLAN_MAP.starter;
+
+        res.json({
+            success: true,
+            licenseToken,
+            plan,
+            planLabel: plan === 'starter' ? 'Starter' : plan === 'business' ? 'Business' : 'Enterprise',
+            maxDevices: meta.maxDevices,
+            message: 'License activated successfully!',
+        });
+    } catch (err) {
+        console.error('License activation error:', err);
+        res.status(500).json({ success: false, error: 'Internal server error.' });
+    }
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true, ts: new Date().toISOString() }));

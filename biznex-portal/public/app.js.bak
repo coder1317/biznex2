@@ -1,0 +1,251 @@
+// ════════════════════════════════════════════════════════════════════════════
+// BIZNEX Portal - Redesigned Dashboard
+// ════════════════════════════════════════════════════════════════════════════
+
+const API_URL = window.location.origin;
+let currentUser = null;
+
+// ════════════════════════════════════════════════════════════════════════════
+// PAGE NAVIGATION
+// ════════════════════════════════════════════════════════════════════════════
+
+function showPage(page) {
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+    const el = document.getElementById('page-' + page);
+    if (el) el.style.display = 'block';
+}
+
+function goToLogin() { showPage('login'); }
+function goToSignup() { showPage('signup'); }
+function backToLogin() { document.getElementById('login-form-step').style.display = 'block'; document.getElementById('login-otp-step').style.display = 'none'; }
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('tab-' + tab).style.display = 'block';
+    document.querySelector('[onclick*="' + tab + '"]')?.classList.add('active');
+    loadTabData(tab);
+}
+
+function loadTabData(tab) {
+    if (tab === 'overview') loadOverview();
+    if (tab === 'stores') loadStores();
+    if (tab === 'inventory') loadInventory();
+    if (tab === 'licenses') loadLicenses();
+    if (tab === 'employees') loadEmployees();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// LOGIN
+// ════════════════════════════════════════════════════════════════════════════
+
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    
+    try {
+        const res = await fetch(API_URL + '/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            currentUser = data.account;
+            localStorage.setItem('currentUserEmail', email);
+            showDashboard();
+        } else if (data.requiresCode) {
+            document.getElementById('otp-email').textContent = email;
+            document.getElementById('login-form-step').style.display = 'none';
+            document.getElementById('login-otp-step').style.display = 'block';
+            localStorage.setItem('loginEmail', email);
+        } else {
+            alert('Login failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+});
+
+// Verify OTP during login
+document.getElementById('otpForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = localStorage.getItem('loginEmail');
+    const code = document.getElementById('otp-code').value;
+    
+    try {
+        const res = await fetch(API_URL + '/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            currentUser = data.account;
+            localStorage.setItem('currentUserEmail', email);
+            showDashboard();
+        } else {
+            alert('Invalid code: ' + (data.error || 'Try again'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// SIGNUP  
+// ════════════════════════════════════════════════════════════════════════════
+
+document.getElementById('signupForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('signup-name').value;
+    const email = document.getElementById('signup-email').value;
+    
+    try {
+        const res = await fetch(API_URL + '/api/send-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, plan: 'starter' })
+        });
+        const data = await res.json();
+        
+        if (data.devCode) {
+            document.getElementById('otp-email').textContent = email;
+            if (data.devCode) {
+                document.getElementById('devCodeBox').style.display = 'block';
+                document.getElementById('devCodeVal').textContent = data.devCode;
+            }
+            document.getElementById('signupForm').style.display = 'none';
+            document.getElementById('otpForm').style.display = 'block';
+        } else {
+            alert(data.error || 'Signup failed');
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+
+function showDashboard() {
+    showPage('dashboard');
+    document.getElementById('userDisplayName').textContent = currentUser?.name || 'User';
+    loadOverview();
+}
+
+async function loadOverview() {
+    try {
+        if (!currentUser) return;
+        const res = await fetch(API_URL + '/api/stores/' + currentUser.id);
+        const stores = res.ok ? await res.json() : [];
+        
+        let totalIncome = 0;
+        let totalEmployees = 0;
+        stores.forEach(s => {
+            totalIncome += s.income || 0;
+            totalEmployees += s.employees || 0;
+        });
+        
+        document.getElementById('totalIncome').textContent = '₹' + totalIncome.toLocaleString();
+        document.getElementById('storeCount').textContent = stores.length;
+        document.getElementById('employeeCount').textContent = totalEmployees;
+        
+        const incomeHTML = stores.map(s => '<div style=\"display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155;\"><span>' + s.name + '</span><strong>₹' + (s.income || 0).toLocaleString() + '</strong></div>').join('') || '<p>No stores</p>';
+        document.getElementById('incomeByStore').innerHTML = incomeHTML;
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function loadStores() {
+    try {
+        if (!currentUser) return;
+        const res = await fetch(API_URL + '/api/stores/' + currentUser.id);
+        const stores = res.ok ? await res.json() : [];
+        
+        const html = stores.map(s => '<div style=\"background:#1e293b;padding:16px;border-radius:8px;margin:8px 0;\"><h3>' + s.name + '</h3><p>📍 ' + (s.location || 'No location') + '</p><p>💰 ₹' + (s.income || 0) + ' | 👥 ' + (s.employees || 0) + ' employees</p></div>').join('') || '<p>No stores</p>';
+        document.getElementById('storesGrid').innerHTML = html;
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function loadInventory() {
+    document.getElementById('inventoryTable').innerHTML = '<p>Inventory data coming soon...</p>';
+}
+
+async function loadLicenses() {
+    try {
+        if (!currentUser) return;
+        const res = await fetch(API_URL + '/api/account/' + currentUser.email);
+        const data = res.ok ? await res.json() : {};
+        const keys = data.keys || [];
+        
+        document.getElementById('licenseCount').textContent = keys.length;
+        const html = keys.map(k => '<div style=\"background:#1e293b;padding:12px;border-radius:6px;margin:8px 0;font-family:monospace;\">' + k.key + ' <span style=\"color:#818cf8;\">' + k.plan + '</span></div>').join('') || '<p>No licenses</p>';
+        document.getElementById('licensesList').innerHTML = html;
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function loadEmployees() {
+    document.getElementById('employeesTable').innerHTML = '<p>Employee data coming soon...</p>';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MODALS
+// ════════════════════════════════════════════════════════════════════════════
+
+function showAddStoreModal() {
+    document.getElementById('addStoreModal').style.display = 'flex';
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+document.getElementById('addStoreForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('storeName').value;
+    const location = document.getElementById('storeLocation').value;
+    const type = document.getElementById('storeType').value;
+    
+    try {
+        const res = await fetch(API_URL + '/api/stores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accountId: currentUser.id, name, location, type })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert('Store created!');
+            closeModal('addStoreModal');
+            loadStores();
+        } else {
+            alert('Error: ' + (data.error || 'Failed'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+});
+
+function logout() {
+    currentUser = null;
+    localStorage.removeItem('currentUserEmail');
+    showPage('login');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════════════
+
+window.addEventListener('load', () => {
+    showPage('login');
+});

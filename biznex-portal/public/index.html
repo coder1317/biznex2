@@ -1,377 +1,269 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Biznex Portal</title>
-<link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BIZNEX Portal - Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style-dashboard.css" />
 </head>
 <body>
 
-<!-- ── Top Nav ─────────────────────────────────────────────────────────────── -->
-<nav class="topnav" id="topnav">
-    <div class="topnav-left">
-        <div class="nav-logo-mark">BX</div>
-        <span class="nav-brand">BIZNEX</span>
-        <span class="nav-sub">Portal</span>
-    </div>
-    <div class="topnav-right" id="navRight">
-        <button class="nav-btn" onclick="showPage('register')">Register</button>
-        <button class="nav-btn" onclick="showPage('login')">Login</button>
-        <button class="nav-btn outline" onclick="showPage('admin')">Admin</button>
-    </div>
-</nav>
-
-<!-- ── Page: Register ─────────────────────────────────────────────────────── -->
-<div class="page" id="page-register">
-    <div class="hero">
-        <h1>Get Your License Key</h1>
-        <p>Register with your email, choose a plan, and your key is generated instantly.</p>
-    </div>
-
-    <!-- Plan cards -->
-    <div class="plan-cards" id="planCards">
-        <div class="plan-card str selected" data-plan="starter" onclick="selectPlan('starter')">
-            <div class="plan-icon">🏪</div>
-            <div class="plan-name">Starter</div>
-            <div class="plan-type">Single Store</div>
-            <div class="plan-device">1 device</div>
-            <div class="plan-key-eg">BZNX-STR-…</div>
-            <ul class="plan-features">
-                <li class="yes">POS Terminal</li>
-                <li class="yes">Products &amp; Stock</li>
-                <li class="yes">Orders &amp; Receipts</li>
-                <li class="yes">Reports</li>
-                <li class="no">Multi-Store</li>
-                <li class="no">Analytics Pro</li>
-            </ul>
-        </div>
-        <div class="plan-card biz" data-plan="business" onclick="selectPlan('business')">
-            <div class="plan-badge-top">POPULAR</div>
-            <div class="plan-icon">🏬</div>
-            <div class="plan-name">Business</div>
-            <div class="plan-type">Multi-Store</div>
-            <div class="plan-device">Up to 10 devices</div>
-            <div class="plan-key-eg">BZNX-BIZ-…</div>
-            <ul class="plan-features">
-                <li class="yes">POS Terminal</li>
-                <li class="yes">Products &amp; Stock</li>
-                <li class="yes">Orders &amp; Receipts</li>
-                <li class="yes">Reports</li>
-                <li class="yes">Multi-Store Mgmt</li>
-                <li class="no">Analytics Pro</li>
-            </ul>
-        </div>
-        <div class="plan-card ent" data-plan="enterprise" onclick="selectPlan('enterprise')">
-            <div class="plan-icon">🏢</div>
-            <div class="plan-name">Enterprise</div>
-            <div class="plan-type">Unlimited Stores</div>
-            <div class="plan-device">Unlimited devices</div>
-            <div class="plan-key-eg">BZNX-ENT-…</div>
-            <ul class="plan-features">
-                <li class="yes">POS Terminal</li>
-                <li class="yes">Products &amp; Stock</li>
-                <li class="yes">Orders &amp; Receipts</li>
-                <li class="yes">Reports</li>
-                <li class="yes">Multi-Store Mgmt</li>
-                <li class="yes">Analytics Pro</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="form-card" id="registerFormCard">
-        <!-- Step indicator -->
-        <div class="reg-steps">
-            <div class="reg-step active" id="step-dot-1"><span>1</span><small>Your Info</small></div>
-            <div class="reg-step-line"></div>
-            <div class="reg-step" id="step-dot-2"><span>2</span><small>Verify Email</small></div>
-            <div class="reg-step-line"></div>
-            <div class="reg-step" id="step-dot-3"><span>3</span><small>Get Key</small></div>
-        </div>
-
-        <!-- Step 1: Info -->
-        <div id="regStep1">
-            <h2>Create Account</h2>
-            <p class="form-sub">Selected plan: <span id="selectedPlanLabel" class="highlight-str">Starter</span></p>
-            <form id="registerForm" autocomplete="off">
-                <div class="form-group">
-                    <label>Full Name</label>
-                    <input type="text" id="reg-name" placeholder="e.g. John Smith" required />
-                </div>
+<!-- LOGIN PAGE -->
+<div class="page" id="page-login">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-mark">BX</div>
+                <h1>BIZNEX</h1>
+                <p>Portal</p>
+            </div>
+            <form id="loginForm">
                 <div class="form-group">
                     <label>Email Address</label>
-                    <input type="email" id="reg-email" placeholder="you@company.com" required />
+                    <input type="email" id="login-email" placeholder="you@example.com" required />
                 </div>
-                <button type="submit" class="btn-primary" id="regBtn">
-                    <span id="regBtnText">Send Verification Code →</span>
-                </button>
-            </form>
-            <div id="regError" class="alert error" style="display:none;"></div>
-            <p class="form-foot">Already have an account? <a href="#" onclick="showPage('login')">Login here</a></p>
-        </div>
-
-        <!-- Step 2: OTP Verify -->
-        <div id="regStep2" style="display:none;">
-            <h2>Verify Your Email</h2>
-            <p class="form-sub" id="otpSubtitle">Enter the 6-digit code sent to your email.</p>
-
-            <!-- Dev fallback: shown when SMTP is not configured -->
-            <div id="devCodeBox" style="display:none;" class="dev-code-box">
-                <div class="dev-code-label">Dev Mode — SMTP not configured</div>
-                <div class="dev-code-val" id="devCodeVal"></div>
-                <div class="dev-code-hint">Copy this code into the field below to continue</div>
-            </div>
-
-            <form id="verifyForm" autocomplete="off">
                 <div class="form-group">
-                    <label>6-Digit Verification Code</label>
-                    <div class="otp-row">
-                        <input class="otp-box" id="otp-0" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="otp-1" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="otp-2" maxlength="1" inputmode="numeric" />
-                        <span class="otp-divider">–</span>
-                        <input class="otp-box" id="otp-3" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="otp-4" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="otp-5" maxlength="1" inputmode="numeric" />
-                    </div>
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="Enter password" />
                 </div>
-                <button type="submit" class="btn-primary" id="verifyBtn">
-                    <span id="verifyBtnText">Verify &amp; Generate Key →</span>
-                </button>
+                <button type="submit" class="btn btn-primary">Login</button>
             </form>
-            <div id="verifyError" class="alert error" style="display:none;"></div>
-            <p class="form-foot">
-                <a href="#" id="resendLink" onclick="resendCode()">Resend code</a>
-                &nbsp;&middot;&nbsp;
-                <a href="#" onclick="backToStep1()">Change email</a>
-            </p>
+            <p class="form-footer">First time? <a href="#" onclick="goToSignup(); return false;">Create Account</a></p>
         </div>
     </div>
 </div>
 
-<!-- ── Page: Success ──────────────────────────────────────────────────────── -->
-<div class="page hidden" id="page-success">
-    <div class="success-card">
-        <div class="success-icon">🎉</div>
-        <h2>License Key Generated!</h2>
-        <p id="successSubtitle">Your <strong id="successPlanLabel"></strong> key is ready.</p>
-
-        <div class="key-display">
-            <div class="key-label">YOUR LICENSE KEY</div>
-            <div class="key-mono" id="successKey">BZNX-STR-XXXXXXXX-XXXXXXXX</div>
-            <button class="btn-copy" id="copyBtn" onclick="copyKey()">📋 Copy</button>
-        </div>
-
-        <div class="key-meta" id="successMeta"></div>
-
-        <!-- Credentials box shown after registration -->
-        <div id="successCredentials" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:16px 20px;margin:16px 0;text-align:left;">
-            <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Your Portal Login Credentials</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                <span style="font-size:11px;color:#94a3b8;min-width:70px;">Username</span>
-                <span id="successUsername" style="font-family:monospace;color:#a5b4fc;font-size:15px;font-weight:700;"></span>
+<!-- SIGNUP: EMAIL + PASSWORD -->
+<div class="page" id="page-signup" style="display: none;">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-mark">BX</div>
+                <h1>Create Account</h1>
             </div>
-            <div style="font-size:11px;color:#64748b;margin-top:8px;line-height:1.6;">🔒 Your password was sent to your email along with the license key.<br>You can change your credentials once (no verification needed) from the dashboard.</div>
-        </div>
-
-        <div id="emailStatus" class="alert info" style="display:none;"></div>
-
-        <div class="success-actions">
-            <button class="btn-primary" onclick="goToDashboard()">Open My Dashboard →</button>
-            <button class="btn-secondary" onclick="showPage('register')">Register Another</button>
-        </div>
-
-        <p class="form-foot" style="margin-top:16px;">
-            To activate: open Biznex BOS → enter this key on the license screen.
-        </p>
-    </div>
-</div>
-
-<!-- ── Page: Login ────────────────────────────────────────────────────────── -->
-<div class="page hidden" id="page-login">
-    <div class="form-card center">
-        <div class="form-logo">
-            <div class="nav-logo-mark">BX</div>
-        </div>
-        <h2>Access Your Account</h2>
-
-        <!-- Step 1: Email -->
-        <div id="loginStep1">
-            <p class="form-sub">Enter your registered email to receive a sign-in code.</p>
-            <form id="loginForm" autocomplete="off">
+            <form id="signupEmailForm">
                 <div class="form-group">
                     <label>Email Address</label>
-                    <input type="email" id="login-email" placeholder="you@company.com" required />
+                    <input type="email" id="signup-email" placeholder="you@example.com" required />
                 </div>
-                <button type="submit" class="btn-primary">Send Code →</button>
-            </form>
-            <div id="loginError" class="alert error" style="display:none;"></div>
-            <p class="form-foot">No account? <a href="#" onclick="showPage('register')">Register here</a></p>
-        </div>
-
-        <!-- Step 2: OTP verify -->
-        <div id="loginStep2" style="display:none;">
-            <p class="form-sub" id="loginOtpSubtitle">Enter the 6-digit code sent to your email.</p>
-            <div id="loginDevCodeBox" style="display:none;" class="dev-code-box">
-                <div class="dev-code-label">Dev Mode — SMTP not configured</div>
-                <div class="dev-code-val" id="loginDevCodeVal"></div>
-                <div class="dev-code-hint">Copy this code into the field below</div>
-            </div>
-            <form id="loginOtpForm" autocomplete="off">
                 <div class="form-group">
-                    <label>6-Digit Verification Code</label>
-                    <div class="otp-row">
-                        <input class="otp-box" id="login-otp-0" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="login-otp-1" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="login-otp-2" maxlength="1" inputmode="numeric" />
-                        <span class="otp-divider">–</span>
-                        <input class="otp-box" id="login-otp-3" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="login-otp-4" maxlength="1" inputmode="numeric" />
-                        <input class="otp-box" id="login-otp-5" maxlength="1" inputmode="numeric" />
-                    </div>
+                    <label>Password</label>
+                    <input type="password" id="signup-password" placeholder="Minimum 6 characters" required minlength="6" />
                 </div>
-                <button type="submit" class="btn-primary" id="loginVerifyBtn">
-                    <span id="loginVerifyBtnText">Verify &amp; Sign In →</span>
-                </button>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="signup-password-confirm" placeholder="Confirm your password" required minlength="6" />
+                </div>
+                <button type="submit" class="btn btn-primary">Create Account</button>
             </form>
-            <div id="loginOtpError" class="alert error" style="display:none;"></div>
-            <p class="form-foot">
-                <a href="#" onclick="backToLoginStep1()">Use a different email</a>
-            </p>
+            <p class="form-footer">Have account? <a href="#" onclick="goToLogin(); return false;">Login</a></p>
         </div>
     </div>
 </div>
 
-<!-- ── Page: Dashboard ────────────────────────────────────────────────────── -->
-<div class="page hidden" id="page-dashboard">
-    <div class="dash-layout">
+<!-- LICENSE KEY DISPLAY PAGE -->
+<div class="page" id="page-license-key" style="display: none;">
+    <div class="login-container">
+        <div class="login-card" style="max-width: 600px;">
+            <div class="login-header">
+                <div class="logo-mark">BX</div>
+                <h1>Account Created! 🎉</h1>
+                <p>Save your license key</p>
+            </div>
+            
+            <div style="background: #0d3d0d; border: 2px solid #22c55e; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                <p style="color: #86efac; font-size: 13px; margin: 0 0 12px 0; font-weight: 600;">YOUR LICENSE KEY</p>
+                <div style="background: #020617; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 12px; font-family: monospace; font-size: 16px; font-weight: bold; color: #a5b4fc; word-break: break-all; text-align: center;" id="displayLicenseKey"></div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="copyLicenseKey(); return false;" style="width: 100%; margin-bottom: 8px;">📋 Copy License Key</button>
+                <p style="color: #94a3b8; font-size: 12px; margin: 0; text-align: center;">Click to copy your license key to clipboard</p>
+            </div>
+            
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                <p style="color: #cbd5e1; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">📋 PLAN DETAILS</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <p style="color: #94a3b8; font-size: 12px; margin: 0;">Plan</p>
+                        <p style="color: #cbd5e1; font-size: 16px; margin: 0; font-weight: bold;" id="displayPlan"></p>
+                    </div>
+                    <div>
+                        <p style="color: #94a3b8; font-size: 12px; margin: 0;">Email</p>
+                        <p style="color: #cbd5e1; font-size: 14px; margin: 0; font-weight: 600;" id="displayEmail"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: #1a1a2e; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <p style="color: #94a3b8; font-size: 13px; margin: 0 0 8px 0;">💡 Next Steps:</p>
+                <ol style="color: #94a3b8; font-size: 13px; margin: 0; padding-left: 20px;">
+                    <li>Copy your license key above</li>
+                    <li>Open the BIZNEX app on your device</li>
+                    <li>Paste the key in the License Activation window</li>
+                    <li>Your app will be activated!</li>
+                </ol>
+            </div>
+            
+            <button type="button" class="btn btn-primary" onclick="goToDashboard(); return false;" style="width: 100%;">Enter Dashboard</button>
+        </div>
+    </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="page" id="page-dashboard" style="display: none;">
+    <div class="dashboard-layout">
         <!-- Sidebar -->
-        <aside class="dash-sidebar">
-            <div class="ds-brand">
-                <div class="nav-logo-mark sm">BX</div>
-                <div>
-                    <div class="ds-brand-name">BIZNEX</div>
-                    <div class="ds-brand-sub">Portal</div>
-                </div>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-mark">BX</div>
+                <span class="logo-text">BIZNEX</span>
             </div>
-            <nav class="ds-nav">
-                <button class="ds-nav-item active" onclick="dashTab('overview')" id="tab-overview">📊 Overview</button>
-                <button class="ds-nav-item" onclick="dashTab('stores')" id="tab-stores">🏬 Stores</button>
-                <button class="ds-nav-item" onclick="dashTab('license')" id="tab-license">🔑 License</button>
-                <button class="ds-nav-item" onclick="dashTab('upgrade')" id="tab-upgrade" style="color:#818cf8;">⬆ Upgrade Plan</button>
-                <button class="ds-nav-item" onclick="dashTab('credentials')" id="tab-credentials" style="color:#f59e0b;">🔐 Credentials</button>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="overview" onclick="switchTab('overview'); return false;">
+                    <span class="icon">📊</span> Overview
+                </button>
+                <button class="nav-item" data-tab="stores" onclick="switchTab('stores'); return false;">
+                    <span class="icon">🏪</span> Stores
+                </button>
+                <button class="nav-item" data-tab="inventory" onclick="switchTab('inventory'); return false;">
+                    <span class="icon">📦</span> Inventory
+                </button>
+                <button class="nav-item" data-tab="licenses" onclick="switchTab('licenses'); return false;">
+                    <span class="icon">🔑</span> Licenses
+                </button>
+                <button class="nav-item" data-tab="employees" onclick="switchTab('employees'); return false;">
+                    <span class="icon">👥</span> Employees
+                </button>
             </nav>
-            <div class="ds-footer">
-                <div class="ds-user">
-                    <div class="ds-avatar" id="dashAvatar">?</div>
-                    <div class="ds-user-info">
-                        <div class="ds-username" id="dashUsername">User</div>
-                        <div class="ds-email" id="dashEmail">-</div>
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar">👤</div>
+                    <div class="user-info">
+                        <div class="user-name" id="userDisplayName">User</div>
+                        <button class="btn-logout" onclick="logout(); return false;">Logout</button>
                     </div>
                 </div>
-                <button class="ds-logout" onclick="logout()" title="Logout">⏻</button>
             </div>
         </aside>
 
-        <!-- Content -->
-        <div class="dash-content">
-            <div id="dash-overview" class="dash-tab active">
-                <div class="dash-header">
-                    <h2>Account Overview</h2>
-                    <div class="plan-chip" id="overviewPlanChip"></div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="top-bar">
+                <h1 id="pageTitle">Dashboard</h1>
+            </div>
+
+            <!-- OVERVIEW TAB -->
+            <div class="tab-content active" id="tab-overview">
+                <div class="overview-grid">
+                    <div class="card metric-card">
+                        <div class="metric-icon">💰</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Total Income</div>
+                            <div class="metric-value" id="totalIncome">₹0</div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="metric-icon">🏪</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Active Stores</div>
+                            <div class="metric-value" id="storeCount">0</div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="metric-icon">👥</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Employees</div>
+                            <div class="metric-value" id="employeeCount">0</div>
+                        </div>
+                    </div>
+                    <div class="card metric-card">
+                        <div class="metric-icon">🔑</div>
+                        <div class="metric-content">
+                            <div class="metric-label">Licenses</div>
+                            <div class="metric-value" id="licenseCount">0</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="kpi-row" id="overviewKpis"></div>
-                <div id="overviewStoreGrid"></div>
-            </div>
-
-            <div id="dash-stores" class="dash-tab">
-                <div class="dash-header">
-                    <h2>My Stores</h2>
-                    <button class="btn-primary sm" onclick="openAddStore()">+ Add Store</button>
+                
+                <div class="card">
+                    <div class="card-header"><h3>Income by Store</h3></div>
+                    <div id="incomeByStore"><p class="empty-state">No stores</p></div>
                 </div>
-                <div id="storeList"></div>
-                <!-- Store metrics panel -->
-                <div id="storeMetricsPanel" class="hidden"></div>
+                
+                <div class="card">
+                    <div class="card-header"><h3>⚠️ Items to Restock</h3></div>
+                    <div id="restockAlerts"><p class="empty-state">Allstocks good</p></div>
+                </div>
             </div>
 
-            <div id="dash-license" class="dash-tab">
-                <div class="dash-header"><h2>License Details</h2></div>
-                <div id="licenseDetail"></div>
+            <!-- STORES TAB -->
+            <div class="tab-content" id="tab-stores">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <h2>Your Stores</h2>
+                    <button class="btn btn-sm btn-primary" onclick="showAddStoreModal(); return false;">+ Add Store</button>
+                </div>
+                <div class="stores-grid" id="storesGrid">
+                    <p class="empty-state">No stores yet</p>
+                </div>
             </div>
 
-            <div id="dash-upgrade" class="dash-tab">
-                <div class="dash-header"><h2>Upgrade Plan</h2></div>
-                <div id="upgradeContent"></div>
+            <!-- INVENTORY TAB -->
+            <div class="tab-content" id="tab-inventory">
+                <div class="card">
+                    <div class="card-header"><h3>Inventory</h3></div>
+                    <div id="inventoryTable"><p class="empty-state">No inventory data</p></div>
+                </div>
             </div>
 
-            <div id="dash-credentials" class="dash-tab">
-                <div class="dash-header"><h2>Credentials</h2></div>
-                <div id="credentialsContent"></div>
+            <!-- LICENSES TAB -->
+            <div class="tab-content" id="tab-licenses">
+                <h2>Your Licenses</h2>
+                <div id="licensesList"><p class="empty-state">No licenses</p></div>
             </div>
-        </div>
+
+            <!-- EMPLOYEES TAB -->
+            <div class="tab-content" id="tab-employees">
+                <div class="card">
+                    <div class="card-header"><h3>Employees</h3></div>
+                    <div id="employeesTable"><p class="empty-state">No employee data</p></div>
+                </div>
+            </div>
+        </main>
     </div>
 </div>
 
-<!-- ── Page: Admin ────────────────────────────────────────────────────────── -->
-<div class="page hidden" id="page-admin">
-    <div class="admin-layout">
-        <div class="admin-header">
-            <div>
-                <h2>Admin Panel</h2>
-                <p>Generate & manage license keys for any account.</p>
-            </div>
-            <div id="adminAuthBox">
-                <input type="password" id="adminSecret" placeholder="Admin secret key" class="admin-secret-input" />
-                <button class="btn-primary sm" onclick="adminLogin()">Unlock →</button>
-            </div>
+<!-- ADD STORE MODAL -->
+<div class="modal" id="addStoreModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add New Store</h2>
+            <button class="modal-close" onclick="closeModal('addStoreModal'); return false;">✕</button>
         </div>
-        <div id="adminContent" class="hidden">
-            <!-- Generate key form -->
-            <div class="admin-section">
-                <h3>Generate License Key</h3>
-                <div class="admin-form">
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="admin-gen-email" placeholder="customer@example.com" />
-                    </div>
-                    <div class="form-group">
-                        <label>Name</label>
-                        <input type="text" id="admin-gen-name" placeholder="Customer Name" />
-                    </div>
-                    <div class="form-group">
-                        <label>Plan</label>
-                        <select id="admin-gen-plan">
-                            <option value="starter">Starter (BZNX-STR)</option>
-                            <option value="business">Business (BZNX-BIZ)</option>
-                            <option value="enterprise">Enterprise (BZNX-ENT)</option>
-                        </select>
-                    </div>
-                    <button class="btn-primary sm" onclick="adminGenKey()">Generate &amp; Send →</button>
+        <div class="modal-body">
+            <form id="addStoreForm">
+                <div class="form-group">
+                    <label>Store Name</label>
+                    <input type="text" id="storeName" placeholder="e.g. Main Store" required />
                 </div>
-                <div id="adminGenResult" class="hidden"></div>
-            </div>
-
-            <!-- All accounts table -->
-            <div class="admin-section">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                    <h3 style="margin:0;">All Accounts</h3>
-                    <button class="btn-secondary sm" onclick="loadAdminAccounts()">↻ Refresh</button>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="storeLocation" placeholder="e.g. Downtown" required />
                 </div>
-                <div id="adminAccountsTable"></div>
-            </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="storeType" required>
+                        <option value="retail">Retail</option>
+                        <option value="restaurant">Restaurant</option>
+                        <option value="supermarket">Supermarket</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('addStoreModal'); return false;">Cancel</button>
+            <button type="submit" class="btn btn-primary" form="addStoreForm">Create Store</button>
         </div>
     </div>
 </div>
-
-<!-- ── Modals ─────────────────────────────────────────────────────────────── -->
-<div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal()">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <div id="modalContent"></div>
-    </div>
-</div>
-
-<!-- ── Toast ──────────────────────────────────────────────────────────────── -->
-<div id="toast-area"></div>
 
 <script src="app.js"></script>
 </body>

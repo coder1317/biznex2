@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIZNEX Portal - Enhanced Signup</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        /* Plan Selection */
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .plan-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            cursor: pointer;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .plan-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .plan-card.selected {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        .plan-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .plan-description {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+            min-height: 40px;
+        }
+        .plan-features {
+            text-align: left;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #555;
+        }
+        .plan-features li {
+            list-style: none;
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .plan-features li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        /* Form Section */
+        .form-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .form-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Response Section */
+        .response-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 20px;
+        }
+        .response-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 18px;
+        }
+        .success-box {
+            background: #f0fff4;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .success-box h4 {
+            color: #10b981;
+            margin-bottom: 10px;
+        }
+        .credential-box {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .credential-label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .credential-value {
+            color: #333;
+            font-weight: 500;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover { background: #5568d3; }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .feature-item {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .feature-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .feature-value {
+            color: #10b981;
+            font-size: 14px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .btn-primary:hover { background: #5568d3; }
+        .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+        .error-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header p { font-size: 16px; opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 BIZNEX Portal</h1>
+            <p>Create Your Account & Get License</p>
+        </div>
+
+        <!-- Plan Selection -->
+        <div class="form-section">
+            <h3>📋 Select Your Plan</h3>
+            <div class="plans-grid">
+                <div class="plan-card" data-plan="starter" onclick="selectPlan('starter')">
+                    <div class="plan-name">🌟 Starter</div>
+                    <div class="plan-description">Single Store</div>
+                    <ul class="plan-features">
+                        <li>1 Store Location</li>
+                        <li>POS Terminal</li>
+                        <li>Basic Reports</li>
+                        <li>Cloud Sync</li>
+                    </ul>
+                </div>
+                <div class="plan-card" data-plan="business" onclick="selectPlan('business')">
+                    <div class="plan-name">💼 Business</div>
+                    <div class="plan-description">Multi-Store</div>
+                    <ul class="plan-features">
+                        <li>10 Locations</li>
+                        <li>Multi-Store Sync</li>
+                        <li>Advanced Reports</li>
+                        <li>Priority Support</li>
+                    </ul>
+                </div>
+                <div class="plan-card" data-plan="enterprise" onclick="selectPlan('enterprise')">
+                    <div class="plan-name">👑 Enterprise</div>
+                    <div class="plan-description">Unlimited</div>
+                    <ul class="plan-features">
+                        <li>Unlimited Locations</li>
+                        <li>Custom Branding</li>
+                        <li>Full API Access</li>
+                        <li>Premium Support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signup Form -->
+        <div class="form-section">
+            <h3>📝 Create Account</h3>
+            <div id="errorBox"></div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" placeholder="you@example.com" required />
+                </div>
+                <div class="form-group">
+                    <label>Portal Password</label>
+                    <input type="password" id="portalPassword" placeholder="Your portal login password" required />
+                </div>
+                <button type="submit" class="btn btn-primary">Create Account & Generate License</button>
+            </form>
+        </div>
+
+        <!-- Response -->
+        <div id="responseContainer"></div>
+    </div>
+
+    <script>
+        let selectedPlan = 'starter';
+
+        function selectPlan(plan) {
+            selectedPlan = plan;
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-plan="${plan}"]`).classList.add('selected');
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('portalPassword').value;
+            const plan = selectedPlan;
+
+            const errorBox = document.getElementById('errorBox');
+            const responseContainer = document.getElementById('responseContainer');
+            errorBox.innerHTML = '';
+            responseContainer.innerHTML = '<p style="text-align: center;"><span class="loading">⏳</span> Creating account...</p>';
+
+            try {
+                const response = await fetch('http://localhost:5000/api/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, plan })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    errorBox.innerHTML = `<div class="error-box">${data.error}</div>`;
+                    responseContainer.innerHTML = '';
+                    return;
+                }
+
+                // Display success
+                responseContainer.innerHTML = `
+                    <div class="response-section">
+                        <h3>✅ Account Created Successfully!</h3>
+                        
+                        <div class="success-box">
+                            <h4>📧 Account Information</h4>
+                            <div class="credential-box">
+                                <div class="credential-label">Email</div>
+                                <div class="credential-value">${data.account.email}
+                                    <button type="button" class="copy-btn" onclick="copyToClipboard('${data.account.email}')">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="success-box">
+                            <h4>🔐 App Login Credentials (auto-generated)</h4>
+                            <div class="credential-box">
+                                <div class="credential-label">Username</div>
+                                <div class="credential-value">${data.credentials.username}
+                                    <button type="button" class="copy-btn" onclick="copyToClipboard('${data.credentials.username}')">Copy</button>
+                                </div>
+                            </div>
+                            <div class="credential-box">
+                                <div class="credential-label">Password</div>
+                                <div class="credential-value">${data.credentials.password}
+                                    <button type="button" class="copy-btn" onclick="copyToClipboard('${data.credentials.password}')">Copy</button>
+                                </div>
+                            </div>
+                            <p style="color: #666; font-size: 12px; margin-top: 10px;">⚠️ ${data.credentials.note}</p>
+                        </div>
+
+                        <div class="success-box">
+                            <h4>🔑 License Key</h4>
+                            <div class="credential-box">
+                                <div class="credential-label">Key</div>
+                                <div class="credential-value">${data.license.key}
+                                    <button type="button" class="copy-btn" onclick="copyToClipboard('${data.license.key}')">Copy</button>
+                                </div>
+                            </div>
+                            <div class="credential-box">
+                                <div class="credential-label">Plan</div>
+                                <div class="credential-value">${data.license.planType} (${data.license.maxDevices} device${data.license.maxDevices !== 1 ? 's' : ''})</div>
+                            </div>
+                        </div>
+
+                        <div class="success-box">
+                            <h4>✨ Included Features</h4>
+                            <div class="features-grid">
+                                ${Object.entries(data.features).map(([key, value]) => {
+                                    const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                    return `
+                                        <div class="feature-item">
+                                            <div class="feature-name">${displayKey}</div>
+                                            <div class="feature-value">${typeof value === 'boolean' ? (value ? '✓ Enabled' : '✗ Disabled') : value}</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                            <strong>📌 Next Steps:</strong>
+                            <ol style="margin-top: 10px; margin-left: 20px;">
+                                <li>Open your BIZNEX app</li>
+                                <li>Go to Settings → License Activation</li>
+                                <li>Paste the license key above</li>
+                                <li>Your app will unlock all ${data.license.planType} features!</li>
+                            </ol>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                errorBox.innerHTML = `<div class="error-box">Error: ${err.message}</div>`;
+                responseContainer.innerHTML = '';
+            }
+        });
+
+        // Select first plan by default
+        selectPlan('starter');
+    </script>
+</body>
+</html>
