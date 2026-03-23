@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src http://localhost:* https://* ws://localhost:* wss://*; font-src 'self' data:">
+    <title>Biznex2 - Multi-Store POS</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- First-Time Setup Wizard -->
+    <div id="setupWizard" class="setup-wizard hidden">
+        <div class="setup-container">
+            <div class="setup-header">
+                <h1>📱 Welcome to Biznex2</h1>
+                <p>Multi-Store POS System - Setup Your Admin Account</p>
+            </div>
+            <form id="setupForm" class="setup-form">
+                <div class="setup-field">
+                    <label for="storeName">Business/Store Name</label>
+                    <input type="text" id="storeName" placeholder="e.g., Main Store" required>
+                </div>
+                <div class="setup-field">
+                    <label for="adminUsername">Admin Username</label>
+                    <input type="text" id="adminUsername" placeholder="e.g., admin" required>
+                </div>
+                <div class="setup-field">
+                    <label for="adminEmail">Admin Email</label>
+                    <input type="email" id="adminEmail" placeholder="admin@yourbusiness.com">
+                </div>
+                <div class="setup-field">
+                    <label for="adminPassword">Admin Password</label>
+                    <input type="password" id="adminPassword" placeholder="Enter a strong password" required>
+                </div>
+                <div class="setup-field">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" placeholder="Confirm password" required>
+                </div>
+                <button type="submit" class="setup-btn">✓ Complete Setup</button>
+                <div id="setupError" class="error-message" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginModal" class="login-modal hidden">
+        <div class="login-card">
+            <div class="login-brand">
+                <h1>BIZNEX2</h1>
+                <p>Multi-Store POS System</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="login-field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Enter username" required>
+                </div>
+                <div class="login-field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="login-btn">Sign In</button>
+                <div id="loginError" class="error-message" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Biznex2</h2>
+                <p id="storeIndicator" class="store-indicator">Main Store</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-section="dashboard">📊 Dashboard</a>
+                <a href="#" class="nav-item" data-section="pos">🛒 POS</a>
+                <a href="#" class="nav-item" data-section="products">📦 Products</a>
+                <a href="#" class="nav-item" data-section="orders">📋 Orders</a>
+                <a href="#" class="nav-item" data-section="stores">🏪 Stores</a>
+                <a href="#" class="nav-item" data-section="settings">⚙️ Settings</a>
+            </nav>
+            <div class="sidebar-footer">
+                <p id="userDisplay" class="user-display">Admin</p>
+                <button id="logoutBtn" class="logout-btn">Logout</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboardSection" class="section active">
+                <h2>Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Sales</h3>
+                        <p id="totalSales" class="stat-value">$0.00</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Orders Today</h3>
+                        <p id="ordersCount" class="stat-value">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Stock</h3>
+                        <p id="totalStock" class="stat-value">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- POS Section -->
+            <section id="posSection" class="section">
+                <h2>Point of Sale</h2>
+                <div class="pos-layout">
+                    <div class="products-list">
+                        <h3>Products</h3>
+                        <div id="productsContainer" class="products-container"></div>
+                    </div>
+                    <div class="cart">
+                        <h3>Shopping Cart</h3>
+                        <table id="cartTable" class="cart-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                    <th>Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartBody"></tbody>
+                        </table>
+                        <div class="cart-summary">
+                            <p>Total: <strong id="cartTotal">$0.00</strong></p>
+                            <input type="text" id="customerName" placeholder="Customer Name (optional)">
+                            <select id="paymentMethod">
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="cheque">Cheque</option>
+                            </select>
+                            <button id="checkoutBtn" class="checkout-btn">Complete Sale</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Products Section -->
+            <section id="productsSection" class="section">
+                <h2>Manage Products</h2>
+                <div class="products-management">
+                    <div class="add-product-form">
+                        <h3>Add New Product</h3>
+                        <form id="addProductForm">
+                            <input type="text" id="productName" placeholder="Product Name" required>
+                            <input type="text" id="productSku" placeholder="SKU (optional)">
+                            <input type="number" id="productPrice" placeholder="Price" step="0.01" required>
+                            <input type="number" id="productCost" placeholder="Cost Price" step="0.01">
+                            <input type="number" id="productStock" placeholder="Stock Quantity" required>
+                            <input type="text" id="productCategory" placeholder="Category">
+                            <button type="submit" class="btn-primary">Add Product</button>
+                        </form>
+                    </div>
+                    <div class="products-list-table">
+                        <table id="productsTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>SKU</th>
+                                    <th>Price</th>
+                                    <th>Stock</th>
+                                    <th>Category</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Orders Section -->
+            <section id="ordersSection" class="section">
+                <h2>Order History</h2>
+                <table id="ordersTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Items</th>
+                            <th>Total</th>
+                            <th>Payment</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody"></tbody>
+                </table>
+            </section>
+
+            <!-- Stores Section -->
+            <section id="storesSection" class="section">
+                <h2>Manage Stores (Multi-Store System)</h2>
+                <div class="stores-management">
+                    <div class="add-store-form">
+                        <h3>Add New Store</h3>
+                        <form id="addStoreForm">
+                            <input type="text" id="storeName" placeholder="Store Name" required>
+                            <input type="text" id="storeLocation" placeholder="Location">
+                            <input type="email" id="storeEmail" placeholder="Email">
+                            <input type="tel" id="storePhone" placeholder="Phone">
+                            <input type="text" id="storeAddress" placeholder="Address">
+                            <button type="submit" class="btn-primary">Add Store</button>
+                        </form>
+                    </div>
+                    <div class="stores-list">
+                        <table id="storesTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Store Name</th>
+                                    <th>Location</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody id="storesTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settingsSection" class="section">
+                <h2>Settings</h2>
+                <div class="settings-content">
+                    <h3>App Information</h3>
+                    <p><strong>Version:</strong> 2.0.0</p>
+                    <p><strong>Type:</strong> Multi-Store POS System</p>
+                    <p><strong>License:</strong> No activation required</p>
+                    <button id="logoutSettingsBtn" class="btn-danger">Logout</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

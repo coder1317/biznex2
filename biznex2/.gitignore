@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database & Logs
+*.db
+*.db-wal
+*.db-shm
+logs/
+biznex2.db*
+*.sqlite
+backups/
+
+# Build & Distribution
+dist/
+biznex2-dist/
+releases/
+*.exe
+*.nsis
+out/
+build/
+
+# Electron
+electron-dist/
+electron-builder-effective-config.yaml
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Misc
+.env
+*.pem
+*.key
+secrets/
+private/
