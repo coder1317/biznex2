@@ -1,0 +1,348 @@
+{
+  "system_settings": [],
+  "stores": [
+    {
+      "id": 1,
+      "name": "Main Store",
+      "location": "Headquarters",
+      "phone": "+1-555-0001",
+      "email": "main@biznex.com",
+      "address": "123 Business Ave, City, State 12345",
+      "is_active": 1,
+      "created_at": "2026-03-23T17:01:20.167Z",
+      "updated_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 2,
+      "name": "Downtown Branch",
+      "location": "Downtown",
+      "phone": "+1-555-0002",
+      "email": "downtown@biznex.com",
+      "address": "456 Commerce St, City, State 12345",
+      "is_active": 1,
+      "created_at": "2026-03-23T17:01:20.181Z",
+      "updated_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 3,
+      "name": "Mall Store",
+      "location": "Shopping Mall",
+      "phone": "+1-555-0003",
+      "email": "mall@biznex.com",
+      "address": "789 Shopping Center, City, State 12345",
+      "is_active": 1,
+      "created_at": "2026-03-23T17:01:20.181Z",
+      "updated_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 4,
+      "name": "Warehouse Store",
+      "location": "Test Location",
+      "phone": "+1-555-9999",
+      "email": "warehouse@test.com",
+      "address": "",
+      "created_at": "2026-03-23T17:03:53.228Z",
+      "updated_at": "2026-03-23T17:03:53.228Z"
+    }
+  ],
+  "products": [
+    {
+      "id": 1,
+      "name": "Laptop",
+      "price": 999.99,
+      "stock": 15,
+      "store_id": 1,
+      "category": "Electronics",
+      "sku": "LAP-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 2,
+      "name": "Wireless Mouse",
+      "price": 29.99,
+      "stock": 50,
+      "store_id": 1,
+      "category": "Accessories",
+      "sku": "MOU-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 3,
+      "name": "Mechanical Keyboard",
+      "price": 149.99,
+      "stock": 30,
+      "store_id": 1,
+      "category": "Accessories",
+      "sku": "KEY-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 4,
+      "name": "USB-C Cable",
+      "price": 14.99,
+      "stock": 100,
+      "store_id": 1,
+      "category": "Cables",
+      "sku": "USB-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 5,
+      "name": "Monitor 27 inch",
+      "price": 299.99,
+      "stock": 12,
+      "store_id": 1,
+      "category": "Electronics",
+      "sku": "MON-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 6,
+      "name": "Desk Lamp",
+      "price": 49.99,
+      "stock": 25,
+      "store_id": 2,
+      "category": "Furniture",
+      "sku": "LAM-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 7,
+      "name": "Office Chair",
+      "price": 199.99,
+      "stock": 8,
+      "store_id": 2,
+      "category": "Furniture",
+      "sku": "CHR-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 8,
+      "name": "Headphones",
+      "price": 79.99,
+      "stock": 40,
+      "store_id": 3,
+      "category": "Audio",
+      "sku": "HEAD-001",
+      "created_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 9,
+      "store_id": 1,
+      "name": "Test Product - SSD",
+      "sku": null,
+      "price": 89.99,
+      "cost_price": 0,
+      "stock": 20,
+      "category": "Uncategorized",
+      "created_at": "2026-03-23T17:03:53.218Z",
+      "updated_at": "2026-03-23T17:03:53.218Z"
+    }
+  ],
+  "orders": [
+    {
+      "id": 1,
+      "customer_name": "John Doe",
+      "store_id": 1,
+      "total": 1079.98,
+      "payment_method": "card",
+      "items": [
+        {
+          "product_id": 1,
+          "product_name": "Laptop",
+          "quantity": 1,
+          "price": 999.99
+        },
+        {
+          "product_id": 2,
+          "product_name": "Wireless Mouse",
+          "quantity": 1,
+          "price": 29.99
+        }
+      ],
+      "created_at": "2026-03-21T17:01:20.181Z",
+      "updated_at": "2026-03-21T17:01:20.181Z"
+    },
+    {
+      "id": 2,
+      "customer_name": "Jane Smith",
+      "store_id": 1,
+      "total": 194.97,
+      "payment_method": "cash",
+      "items": [
+        {
+          "product_id": 3,
+          "product_name": "Mechanical Keyboard",
+          "quantity": 1,
+          "price": 149.99
+        },
+        {
+          "product_id": 4,
+          "product_name": "USB-C Cable",
+          "quantity": 3,
+          "price": 14.99
+        }
+      ],
+      "created_at": "2026-03-22T17:01:20.181Z",
+      "updated_at": "2026-03-22T17:01:20.181Z"
+    },
+    {
+      "id": 3,
+      "customer_name": "Bob Johnson",
+      "store_id": 2,
+      "total": 249.98,
+      "payment_method": "card",
+      "items": [
+        {
+          "product_id": 6,
+          "product_name": "Desk Lamp",
+          "quantity": 2,
+          "price": 49.99
+        }
+      ],
+      "created_at": "2026-03-23T17:01:20.181Z",
+      "updated_at": "2026-03-23T17:01:20.181Z"
+    },
+    {
+      "id": 4,
+      "store_id": 1,
+      "order_no": "ORD-1774285433324",
+      "customer_name": "Walk-in",
+      "customer_phone": "",
+      "payment_method": "cash",
+      "total": 999.99,
+      "created_at": "2026-03-23T17:03:53.324Z",
+      "updated_at": "2026-03-23T17:03:53.324Z"
+    }
+  ],
+  "order_items": [
+    {
+      "id": 1,
+      "order_id": 1,
+      "product_id": 1,
+      "quantity": 1,
+      "price": 999.99
+    },
+    {
+      "id": 2,
+      "order_id": 1,
+      "product_id": 2,
+      "quantity": 1,
+      "price": 29.99
+    },
+    {
+      "id": 3,
+      "order_id": 2,
+      "product_id": 3,
+      "quantity": 1,
+      "price": 149.99
+    },
+    {
+      "id": 4,
+      "order_id": 2,
+      "product_id": 4,
+      "quantity": 3,
+      "price": 14.99
+    },
+    {
+      "id": 5,
+      "order_id": 3,
+      "product_id": 6,
+      "quantity": 2,
+      "price": 49.99
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@biznex.com",
+      "password": "$2a$10$NhwAOlRWui8iHNwTbiOoZOeElkhL/l9OFWuSuSm7sPNlI7Xb.V2ZG",
+      "role": "admin",
+      "store_id": 1,
+      "created_at": "2026-03-23T17:01:20.302Z"
+    },
+    {
+      "id": 2,
+      "username": "manager",
+      "email": "manager@biznex.com",
+      "password": "$2a$10$L2JtOGxp9LDyuEl1KxLAa.K29HRU6yx2q7sGR4DZ0tTWqykShTFEW",
+      "role": "manager",
+      "store_id": 2,
+      "created_at": "2026-03-23T17:01:20.372Z"
+    },
+    {
+      "id": 3,
+      "username": "staff",
+      "email": "staff@biznex.com",
+      "password": "$2a$10$sjKb5S9Het8MhcQtNEeuBOFwB2/kMAAioYmKroZPLxcQ9s8BnKzyG",
+      "role": "staff",
+      "store_id": 1,
+      "created_at": "2026-03-23T17:01:20.440Z"
+    },
+    {
+      "id": 4,
+      "username": "testuser",
+      "email": "test@biznex.com",
+      "password": "$2a$10$tfViwaLApfUlMI0ACE69I.0w/PSs/dQFD.OO/W7YIKr44v9rAiyGS",
+      "role": "staff",
+      "created_at": "2026-03-23T17:03:53.317Z",
+      "updated_at": "2026-03-23T17:03:53.317Z"
+    }
+  ],
+  "stock_movements": [],
+  "categories": [
+    {
+      "id": 1,
+      "name": "Electronics",
+      "store_id": 1
+    },
+    {
+      "id": 2,
+      "name": "Accessories",
+      "store_id": 1
+    },
+    {
+      "id": 3,
+      "name": "Cables",
+      "store_id": 1
+    },
+    {
+      "id": 4,
+      "name": "Furniture",
+      "store_id": 2
+    },
+    {
+      "id": 5,
+      "name": "Audio",
+      "store_id": 3
+    }
+  ],
+  "suppliers": [
+    {
+      "id": 2,
+      "name": "Global Distributors",
+      "contact_person": "Sarah Wilson",
+      "email": "sales@globaldist.com",
+      "phone": "+1-555-1002",
+      "created_at": "2026-03-23T17:01:20.440Z"
+    },
+    {
+      "id": 3,
+      "name": "Premium Electronics Ltd",
+      "contact_person": "David Kumar",
+      "email": "procurement@premium-elec.com",
+      "phone": "+1-555-1003",
+      "created_at": "2026-03-23T17:01:20.440Z"
+    },
+    {
+      "id": 4,
+      "name": "Test Supplier Co",
+      "contact_person": "John Test",
+      "email": "john@test.com",
+      "phone": "+1-555-8888",
+      "created_at": "2026-03-23T17:03:53.232Z",
+      "updated_at": "2026-03-23T17:03:53.232Z"
+    }
+  ]
+}
