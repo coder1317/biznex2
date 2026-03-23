@@ -33,7 +33,8 @@ class SimpleDB {
             order_items: [],
             users: [],
             stock_movements: [],
-            categories: []
+            categories: [],
+            suppliers: []
         };
     }
 
@@ -50,6 +51,7 @@ class SimpleDB {
         console.log("✅ users table ready");
         console.log("✅ stock_movements table ready");
         console.log("✅ categories table ready");
+        console.log("✅ suppliers table ready");
 
         // Create default store if needed
         if (this.data.stores.length === 0) {

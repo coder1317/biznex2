@@ -304,6 +304,84 @@ app.post('/api/stores', authenticateToken, (req, res) => {
     });
 });
 
+// ─── API: Suppliers ────────────────────────────────────────────────────────
+app.get('/api/suppliers', authenticateToken, (req, res) => {
+    db.all('SELECT * FROM suppliers ORDER BY name', [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to fetch suppliers' });
+        }
+        res.json(rows || []);
+    });
+});
+
+app.post('/api/suppliers', authenticateToken, (req, res) => {
+    const { name, contact_person, email, phone } = req.body;
+
+    if (!name) {
+        return res.status(400).json({ error: 'Supplier name required' });
+    }
+
+    db.run(`
+        INSERT INTO suppliers (name, contact_person, email, phone)
+        VALUES (?, ?, ?, ?)
+    `, [name, contact_person || '', email || '', phone || ''], (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to create supplier' });
+        }
+        res.json({ success: true, message: 'Supplier created' });
+    });
+});
+
+app.delete('/api/suppliers/:id', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    db.run('DELETE FROM suppliers WHERE id = ?', [id], (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to delete supplier' });
+        }
+        res.json({ success: true, message: 'Supplier deleted' });
+    });
+});
+
+// ─── API: Users ───────────────────────────────────────────────────────────
+app.get('/api/users', authenticateToken, (req, res) => {
+    db.all('SELECT id, username, email, role FROM users ORDER BY username', [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to fetch users' });
+        }
+        res.json(rows || []);
+    });
+});
+
+app.post('/api/users', authenticateToken, (req, res) => {
+    const { username, email, password, role } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    db.run(`
+        INSERT INTO users (username, email, password, role)
+        VALUES (?, ?, ?, ?)
+    `, [username, email || '', hashedPassword, role || 'staff'], (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to create user' });
+        }
+        res.json({ success: true, message: 'User created' });
+    });
+});
+
+app.delete('/api/users/:id', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    db.run('DELETE FROM users WHERE id = ?', [id], (err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to delete user' });
+        }
+        res.json({ success: true, message: 'User deleted' });
+    });
+});
+
 // ─── API: Dashboard Stats ──────────────────────────────────────────────────
 app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
     const storeId = req.user.storeId || 1;

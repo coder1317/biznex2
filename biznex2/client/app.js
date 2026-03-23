@@ -13,9 +13,11 @@ let currentPage = "dashboard";
 let currentStore = null;
 let allProducts = [];
 let allOrders = [];
+let allUsers = [];
+let allSuppliers = [];
 let cart = [];
 
-const pages = ["dashboard", "pos", "products", "orders", "stores", "settings"];
+const pages = ["dashboard", "pos", "products", "orders", "stores", "suppliers", "users", "settings"];
 
 // Initialize app
 async function init() {
@@ -94,6 +96,8 @@ function setupApp() {
         { id: "products", label: "📦 Products" },
         { id: "orders", label: "📋 Orders" },
         { id: "stores", label: "🏪 Stores" },
+        { id: "suppliers", label: "🚚 Suppliers" },
+        { id: "users", label: "👥 Users" },
         { id: "settings", label: "⚙️ Settings" }
     ];
     
@@ -115,6 +119,8 @@ function setupApp() {
     // Setup forms
     document.getElementById("addProductForm").addEventListener("submit", addProduct);
     document.getElementById("addStoreForm").addEventListener("submit", addStore);
+    document.getElementById("addSupplierForm").addEventListener("submit", addSupplier);
+    document.getElementById("addUserForm").addEventListener("submit", addUser);
     
     // Update user display
     document.getElementById("userDisplay").textContent = currentUser?.username || "User";
@@ -144,6 +150,8 @@ function showPage(page) {
         products: "Manage Products",
         orders: "Order History",
         stores: "Manage Stores",
+        suppliers: "Manage Suppliers",
+        users: "Manage Users",
         settings: "Settings"
     }[page] || "Dashboard";
     
@@ -151,6 +159,8 @@ function showPage(page) {
     else if (page === "products") loadProducts();
     else if (page === "orders") loadOrders();
     else if (page === "stores") loadStores();
+    else if (page === "suppliers") loadSuppliers();
+    else if (page === "users") loadUsers();
 }
 
 async function loadDashboard() {
@@ -219,6 +229,54 @@ async function loadStores() {
         }
     } catch (err) {
         console.error("Failed to load stores:", err);
+    }
+}
+
+async function loadSuppliers() {
+    const table = document.getElementById("suppliersTableBody");
+    if (!table) return;
+    try {
+        const res = await fetch(`${BASE_URL}/api/suppliers`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            allSuppliers = await res.json();
+            table.innerHTML = allSuppliers.map(s => `
+                <tr>
+                    <td>${s.name}</td>
+                    <td>${s.contact_person}</td>
+                    <td>${s.email}</td>
+                    <td>${s.phone}</td>
+                    <td><button class="btn btn-secondary" onclick="deleteSupplier(${s.id})">Delete</button></td>
+                </tr>
+            `).join("");
+        }
+    } catch (err) {
+        console.error("Failed to load suppliers:", err);
+    }
+}
+
+async function loadUsers() {
+    const table = document.getElementById("usersTableBody");
+    if (!table) return;
+    try {
+        const res = await fetch(`${BASE_URL}/api/users`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            allUsers = await res.json();
+            table.innerHTML = allUsers.map(u => `
+                <tr>
+                    <td>${u.username}</td>
+                    <td>${u.email}</td>
+                    <td><span class="status-badge">${u.role || 'staff'}</span></td>
+                    <td><span class="status-badge active">Active</span></td>
+                    <td><button class="btn btn-secondary" onclick="deleteUser(${u.id})">Delete</button></td>
+                </tr>
+            `).join("");
+        }
+    } catch (err) {
+        console.error("Failed to load users:", err);
     }
 }
 
@@ -316,6 +374,64 @@ async function addStore(e) {
             body: JSON.stringify(data)
         });
         if (res.ok) { showToast("Store added!", "success"); loadStores(); e.target.reset(); }
+    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function addSupplier(e) {
+    e.preventDefault();
+    const data = {
+        name: document.getElementById("supplierName").value,
+        contact_person: document.getElementById("supplierContact").value,
+        email: document.getElementById("supplierEmail").value,
+        phone: document.getElementById("supplierPhone").value
+    };
+    try {
+        const res = await fetch(`${BASE_URL}/api/suppliers`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify(data)
+        });
+        if (res.ok) { showToast("Supplier added!", "success"); loadSuppliers(); e.target.reset(); }
+    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function deleteSupplier(id) {
+    if (!confirm("Delete this supplier?")) return;
+    try {
+        const res = await fetch(`${BASE_URL}/api/suppliers/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) { showToast("Supplier deleted", "success"); loadSuppliers(); }
+    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function addUser(e) {
+    e.preventDefault();
+    const data = {
+        username: document.getElementById("userName").value,
+        email: document.getElementById("userEmail").value,
+        password: document.getElementById("userPassword").value,
+        role: document.getElementById("userRole").value
+    };
+    try {
+        const res = await fetch(`${BASE_URL}/api/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify(data)
+        });
+        if (res.ok) { showToast("User added!", "success"); loadUsers(); e.target.reset(); }
+    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function deleteUser(id) {
+    if (!confirm("Delete this user?")) return;
+    try {
+        const res = await fetch(`${BASE_URL}/api/users/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) { showToast("User deleted", "success"); loadUsers(); }
     } catch (err) { showToast("Failed: " + err.message, "danger"); }
 }
 
