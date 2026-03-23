@@ -172,42 +172,65 @@ async function loadDashboard() {
 
 async function loadProducts() {
     const container = document.getElementById("productsContainer");
-    if (!container) return;
-    
-    container.innerHTML = allProducts.map(p => `
-        <div class="stat-card" onclick="addToCart(${p.id})">
-            <strong>${p.name}</strong>
-            <p style="margin: 4px 0; color: var(--primary); font-weight: 700;">$${p.price}</p>
-            <small style="color: #999;">Stock: ${p.stock}</small>
-        </div>
-    `).join("");
-    
     const table = document.getElementById("productsTableBody");
-    if (table) {
-        table.innerHTML = allProducts.map(p => `
-            <tr>
-                <td>${p.name}</td>
-                <td>$${p.price}</td>
-                <td>${p.stock}</td>
-                <td><button class="btn btn-secondary" onclick="deleteProduct(${p.id})">Delete</button></td>
-            </tr>
-        `).join("");
+    if (!container && !table) return;
+    
+    try {
+        const res = await fetch(`${BASE_URL}/api/products`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            allProducts = await res.json();
+            
+            if (container) {
+                container.innerHTML = allProducts.map(p => `
+                    <div class="stat-card" onclick="addToCart(${p.id})">
+                        <strong>${p.name}</strong>
+                        <p style="margin: 4px 0; color: var(--primary); font-weight: 700;">$${p.price}</p>
+                        <small style="color: #999;">Stock: ${p.stock}</small>
+                    </div>
+                `).join("");
+            }
+            
+            if (table) {
+                table.innerHTML = allProducts.map(p => `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td>$${p.price}</td>
+                        <td>${p.stock}</td>
+                        <td><button class="btn btn-secondary" onclick="deleteProduct(${p.id})">Delete</button></td>
+                    </tr>
+                `).join("");
+            }
+        }
+    } catch (err) {
+        console.error("Failed to load products:", err);
     }
 }
 
 async function loadOrders() {
     const table = document.getElementById("ordersTableBody");
     if (!table) return;
-    table.innerHTML = allOrders.map(o => `
-        <tr>
-            <td>#${o.id}</td>
-            <td>${o.customer_name || "N/A"}</td>
-            <td>$${o.total}</td>
-            <td>${o.payment_method}</td>
-            <td>${new Date(o.created_at).toLocaleDateString()}</td>
-            <td>${new Date(o.created_at).toLocaleTimeString()}</td>
-        </tr>
-    `).join("");
+    try {
+        const res = await fetch(`${BASE_URL}/api/orders`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (res.ok) {
+            allOrders = await res.json();
+            table.innerHTML = allOrders.map(o => `
+                <tr>
+                    <td>#${o.id}</td>
+                    <td>${o.customer_name || "N/A"}</td>
+                    <td>$${o.total}</td>
+                    <td>${o.payment_method}</td>
+                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                    <td>${new Date(o.created_at).toLocaleTimeString()}</td>
+                </tr>
+            `).join("");
+        }
+    } catch (err) {
+        console.error("Failed to load orders:", err);
+    }
 }
 
 async function loadStores() {
