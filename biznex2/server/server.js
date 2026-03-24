@@ -220,6 +220,45 @@ app.post('/api/products', authenticateToken, (req, res) => {
     });
 });
 
+app.put('/api/products/:id', authenticateToken, (req, res) => {
+    const { name, sku, price, costPrice, stock, category } = req.body;
+    const productId = req.params.id;
+    const storeId = req.user.storeId || 1;
+
+    if (!name || !price) {
+        return res.status(400).json({ error: 'Name and price required' });
+    }
+
+    db.run(`
+        UPDATE products 
+        SET name=?, sku=?, price=?, cost_price=?, stock=?, category=?
+        WHERE id=? AND store_id=?
+    `, [name, sku || null, price, costPrice || 0, stock || 0, category || 'Uncategorized', productId, storeId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to update product' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json({ success: true, message: 'Product updated' });
+    });
+});
+
+app.delete('/api/products/:id', authenticateToken, (req, res) => {
+    const productId = req.params.id;
+    const storeId = req.user.storeId || 1;
+
+    db.run('DELETE FROM products WHERE id=? AND store_id=?', [productId, storeId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to delete product' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json({ success: true, message: 'Product deleted' });
+    });
+});
+
 // ─── API: Orders ──────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, (req, res) => {
     const storeId = req.user.storeId || 1;
@@ -303,7 +342,42 @@ app.post('/api/stores', authenticateToken, (req, res) => {
         res.json({ success: true, message: 'Store created' });
     });
 });
+app.put('/api/stores/:id', authenticateToken, (req, res) => {
+    const { name, location, phone, email, address } = req.body;
+    const storeId = req.params.id;
 
+    if (!name) {
+        return res.status(400).json({ error: 'Store name required' });
+    }
+
+    db.run(`
+        UPDATE stores 
+        SET name=?, location=?, phone=?, email=?, address=?
+        WHERE id=?
+    `, [name, location || '', phone || '', email || '', address || '', storeId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to update store' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Store not found' });
+        }
+        res.json({ success: true, message: 'Store updated' });
+    });
+});
+
+app.delete('/api/stores/:id', authenticateToken, (req, res) => {
+    const storeId = req.params.id;
+
+    db.run('UPDATE stores SET is_active = 0 WHERE id = ?', [storeId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to delete store' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Store not found' });
+        }
+        res.json({ success: true, message: 'Store deleted' });
+    });
+});
 // ─── API: Suppliers ────────────────────────────────────────────────────────
 app.get('/api/suppliers', authenticateToken, (req, res) => {
     db.all('SELECT * FROM suppliers ORDER BY name', [], (err, rows) => {
@@ -329,6 +403,29 @@ app.post('/api/suppliers', authenticateToken, (req, res) => {
             return res.status(500).json({ error: 'Failed to create supplier' });
         }
         res.json({ success: true, message: 'Supplier created' });
+    });
+});
+
+app.put('/api/suppliers/:id', authenticateToken, (req, res) => {
+    const { name, contact_person, email, phone } = req.body;
+    const supplierId = req.params.id;
+
+    if (!name) {
+        return res.status(400).json({ error: 'Supplier name required' });
+    }
+
+    db.run(`
+        UPDATE suppliers 
+        SET name=?, contact_person=?, email=?, phone=?
+        WHERE id=?
+    `, [name, contact_person || '', email || '', phone || '', supplierId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to update supplier' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+        res.json({ success: true, message: 'Supplier updated' });
     });
 });
 
@@ -372,11 +469,44 @@ app.post('/api/users', authenticateToken, (req, res) => {
     });
 });
 
+app.put('/api/users/:id', authenticateToken, (req, res) => {
+    const { username, email, password, role } = req.body;
+    const userId = req.params.id;
+
+    if (!username) {
+        return res.status(400).json({ error: 'Username required' });
+    }
+
+    let query = 'UPDATE users SET username=?, email=?, role=?';
+    let params = [username, email || '', role || 'staff', userId];
+
+    if (password) {
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        query = 'UPDATE users SET username=?, email=?, password=?, role=?';
+        params = [username, email || '', hashedPassword, role || 'staff', userId];
+    }
+
+    query += ' WHERE id=?';
+
+    db.run(query, params, function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to update user' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ success: true, message: 'User updated' });
+    });
+});
+
 app.delete('/api/users/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
-    db.run('DELETE FROM users WHERE id = ?', [id], (err) => {
+    db.run('DELETE FROM users WHERE id = ?', [id], function(err) {
         if (err) {
             return res.status(500).json({ error: 'Failed to delete user' });
+        }
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'User not found' });
         }
         res.json({ success: true, message: 'User deleted' });
     });

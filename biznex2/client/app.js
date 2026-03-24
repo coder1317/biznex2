@@ -198,7 +198,7 @@ async function loadProducts() {
                         <td>${p.name}</td>
                         <td>$${p.price}</td>
                         <td>${p.stock}</td>
-                        <td><button class="btn btn-secondary" onclick="deleteProduct(${p.id})">Delete</button></td>
+                        <td><button class="btn btn-secondary" onclick="editProduct(${p.id})">Edit</button> <button class="btn btn-secondary" onclick="deleteProduct(${p.id})">Delete</button></td>
                     </tr>
                 `).join("");
             }
@@ -246,8 +246,7 @@ async function loadStores() {
                 <tr>
                     <td>${s.name}</td>
                     <td>${s.location || "N/A"}</td>
-                    <td><span class="status-badge active">Active</span></td>
-                </tr>
+                    <td><span class="status-badge active">Active</span></td>                    <td><button class="btn btn-secondary" onclick="editStore(${s.id})">Edit</button> <button class="btn btn-secondary" onclick="deleteStore(${s.id})">Delete</button></td>                </tr>
             `).join("");
         }
     } catch (err) {
@@ -270,7 +269,7 @@ async function loadSuppliers() {
                     <td>${s.contact_person}</td>
                     <td>${s.email}</td>
                     <td>${s.phone}</td>
-                    <td><button class="btn btn-secondary" onclick="deleteSupplier(${s.id})">Delete</button></td>
+                    <td><button class="btn btn-secondary" onclick="editSupplier(${s.id})">Edit</button> <button class="btn btn-secondary" onclick="deleteSupplier(${s.id})">Delete</button></td>
                 </tr>
             `).join("");
         }
@@ -294,7 +293,7 @@ async function loadUsers() {
                     <td>${u.email}</td>
                     <td><span class="status-badge">${u.role || 'staff'}</span></td>
                     <td><span class="status-badge active">Active</span></td>
-                    <td><button class="btn btn-secondary" onclick="deleteUser(${u.id})">Delete</button></td>
+                    <td><button class="btn btn-secondary" onclick="editUser(${u.id})">Edit</button> <button class="btn btn-secondary" onclick="deleteUser(${u.id})">Delete</button></td>
                 </tr>
             `).join("");
         }
@@ -380,8 +379,54 @@ async function deleteProduct(id) {
             method: "DELETE",
             headers: { Authorization: `Bearer ${authToken}` }
         });
-        if (res.ok) { showToast("Product deleted", "success"); loadProducts(); }
-    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("Product deleted", "success"); 
+            loadProducts(); 
+        } else {
+            showToast(data.error || "Failed to delete product", "danger");
+        }
+    } catch (err) { 
+        showToast("Delete failed: " + err.message, "danger"); 
+    }
+}
+
+async function editProduct(id) {
+    const product = allProducts.find(p => p.id === id);
+    if (!product) { showToast("Product not found", "danger"); return; }
+    
+    const name = prompt("Product Name:", product.name);
+    if (name === null) return;
+    
+    const priceStr = prompt("Price:", product.price);
+    if (priceStr === null) return;
+    const price = parseFloat(priceStr);
+    
+    const stockStr = prompt("Stock:", product.stock);
+    if (stockStr === null) return;
+    const stock = parseInt(stockStr);
+    
+    if (!name || isNaN(price) || isNaN(stock)) {
+        showToast("Invalid input", "danger");
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${BASE_URL}/api/products/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify({ name, price, stock })
+        });
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("Product updated", "success"); 
+            loadProducts(); 
+        } else {
+            showToast(data.error || "Failed to update product", "danger");
+        }
+    } catch (err) { 
+        showToast("Update failed: " + err.message, "danger"); 
+    }
 }
 
 async function addStore(e) {
@@ -396,8 +441,61 @@ async function addStore(e) {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
             body: JSON.stringify(data)
         });
+        const respData = await res.json();
         if (res.ok) { showToast("Store added!", "success"); loadStores(); e.target.reset(); }
+        else { showToast(respData.error || "Failed to add store", "danger"); }
     } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function editStore(id) {
+    const stores = await fetch(`${BASE_URL}/api/stores`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+    }).then(r => r.json());
+    
+    const store = stores.find(s => s.id === id);
+    if (!store) { showToast("Store not found", "danger"); return; }
+    
+    const name = prompt("Store Name:", store.name);
+    if (name === null) return;
+    
+    const location = prompt("Location:", store.location || "");
+    if (location === null) return;
+    
+    try {
+        const res = await fetch(`${BASE_URL}/api/stores/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify({ name, location })
+        });
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("Store updated", "success"); 
+            loadStores(); 
+        } else {
+            showToast(data.error || "Failed to update store", "danger");
+        }
+    } catch (err) { 
+        showToast("Update failed: " + err.message, "danger"); 
+    }
+}
+
+async function deleteStore(id) {
+    if (!confirm("Delete this store?")) return;
+    try {
+        const res = await fetch(`${BASE_URL}/api/stores/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("Store deleted", "success"); 
+            loadStores(); 
+        } else {
+            showToast(data.error || "Failed to delete store", "danger");
+        }
+    } catch (err) { 
+        showToast("Delete failed: " + err.message, "danger"); 
+    }
 }
 
 async function addSupplier(e) {
@@ -414,8 +512,44 @@ async function addSupplier(e) {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
             body: JSON.stringify(data)
         });
+        const respData = await res.json();
         if (res.ok) { showToast("Supplier added!", "success"); loadSuppliers(); e.target.reset(); }
+        else { showToast(respData.error || "Failed to add supplier", "danger"); }
     } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function editSupplier(id) {
+    const supplier = allSuppliers.find(s => s.id === id);
+    if (!supplier) { showToast("Supplier not found", "danger"); return; }
+    
+    const name = prompt("Supplier Name:", supplier.name);
+    if (name === null) return;
+    
+    const contact = prompt("Contact Person:", supplier.contact_person || "");
+    if (contact === null) return;
+    
+    const email = prompt("Email:", supplier.email || "");
+    if (email === null) return;
+    
+    const phone = prompt("Phone:", supplier.phone || "");
+    if (phone === null) return;
+    
+    try {
+        const res = await fetch(`${BASE_URL}/api/suppliers/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify({ name, contact_person: contact, email, phone })
+        });
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("Supplier updated", "success"); 
+            loadSuppliers(); 
+        } else {
+            showToast(data.error || "Failed to update supplier", "danger");
+        }
+    } catch (err) { 
+        showToast("Update failed: " + err.message, "danger"); 
+    }
 }
 
 async function deleteSupplier(id) {
@@ -425,8 +559,16 @@ async function deleteSupplier(id) {
             method: "DELETE",
             headers: { Authorization: `Bearer ${authToken}` }
         });
-        if (res.ok) { showToast("Supplier deleted", "success"); loadSuppliers(); }
-    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("Supplier deleted", "success"); 
+            loadSuppliers(); 
+        } else {
+            showToast(data.error || "Failed to delete supplier", "danger");
+        }
+    } catch (err) { 
+        showToast("Delete failed: " + err.message, "danger"); 
+    }
 }
 
 async function addUser(e) {
@@ -443,8 +585,41 @@ async function addUser(e) {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
             body: JSON.stringify(data)
         });
+        const respData = await res.json();
         if (res.ok) { showToast("User added!", "success"); loadUsers(); e.target.reset(); }
+        else { showToast(respData.error || "Failed to add user", "danger"); }
     } catch (err) { showToast("Failed: " + err.message, "danger"); }
+}
+
+async function editUser(id) {
+    const user = allUsers.find(u => u.id === id);
+    if (!user) { showToast("User not found", "danger"); return; }
+    
+    const username = prompt("Username:", user.username);
+    if (username === null) return;
+    
+    const email = prompt("Email:", user.email || "");
+    if (email === null) return;
+    
+    const role = prompt("Role (admin/manager/staff):", user.role || "staff");
+    if (role === null) return;
+    
+    try {
+        const res = await fetch(`${BASE_URL}/api/users/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+            body: JSON.stringify({ username, email, role })
+        });
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("User updated", "success"); 
+            loadUsers(); 
+        } else {
+            showToast(data.error || "Failed to update user", "danger");
+        }
+    } catch (err) { 
+        showToast("Update failed: " + err.message, "danger"); 
+    }
 }
 
 async function deleteUser(id) {
@@ -454,8 +629,16 @@ async function deleteUser(id) {
             method: "DELETE",
             headers: { Authorization: `Bearer ${authToken}` }
         });
-        if (res.ok) { showToast("User deleted", "success"); loadUsers(); }
-    } catch (err) { showToast("Failed: " + err.message, "danger"); }
+        const data = await res.json();
+        if (res.ok) { 
+            showToast("User deleted", "success"); 
+            loadUsers(); 
+        } else {
+            showToast(data.error || "Failed to delete user", "danger");
+        }
+    } catch (err) { 
+        showToast("Delete failed: " + err.message, "danger"); 
+    }
 }
 
 function switchStore() {
